@@ -14,7 +14,9 @@ const FIRST_CLASS_PROPERTIES: &[&str] = &[PROVIDER_KEY, OUTPUT_KEY, BINARY_TARGE
 pub struct GeneratorLoader {}
 
 impl GeneratorLoader {
-    pub fn load_generators_from_ast(ast_schema: &ast::SchemaAst) -> Result<Vec<Generator>, ErrorCollection> {
+    pub fn load_generators_from_ast(
+        ast_schema: &ast::SchemaAst,
+    ) -> Result<Vec<Generator>, ErrorCollection> {
         let mut generators: Vec<Generator> = vec![];
         let mut errors = ErrorCollection::new();
 
@@ -22,9 +24,14 @@ impl GeneratorLoader {
             match Self::lift_generator(&gen) {
                 Ok(loaded_gen) => generators.push(loaded_gen),
                 // Lift error.
-                Err(DatamodelError::ArgumentNotFound { argument_name, span }) => errors.push(
-                    DatamodelError::new_generator_argument_not_found_error(&argument_name, &gen.name.name, span),
-                ),
+                Err(DatamodelError::ArgumentNotFound {
+                    argument_name,
+                    span,
+                }) => errors.push(DatamodelError::new_generator_argument_not_found_error(
+                    &argument_name,
+                    &gen.name.name,
+                    span,
+                )),
                 Err(err) => errors.push(err),
             }
         }
@@ -68,7 +75,10 @@ impl GeneratorLoader {
             output,
             binary_targets,
             config: properties,
-            documentation: ast_generator.documentation.clone().map(|comment| comment.text),
+            documentation: ast_generator
+                .documentation
+                .clone()
+                .map(|comment| comment.text),
         })
     }
 
@@ -110,7 +120,10 @@ impl GeneratorLoader {
         ast::GeneratorConfig {
             name: ast::Identifier::new(&generator.name),
             properties: arguments,
-            documentation: generator.documentation.clone().map(|text| ast::Comment { text }),
+            documentation: generator
+                .documentation
+                .clone()
+                .map(|text| ast::Comment { text }),
             span: ast::Span::empty(),
         }
     }

@@ -78,7 +78,10 @@ impl TestApi {
 
         self.migration_api.apply_migration(&apply_input).await?;
 
-        let context = PrismaContext::builder(datamodel_string)
+        let dml = datamodel::parse_datamodel(&datamodel_string).unwrap();
+        let config = datamodel::parse_configuration(&datamodel_string).unwrap();
+
+        let context = PrismaContext::builder(config, dml)
             .enable_raw_queries(true)
             .force_transactions(self.is_pgbouncer)
             .build()

@@ -35,9 +35,14 @@ impl SourceLoader {
                 Ok(Some(loaded_src)) => sources.push(loaded_src),
                 Ok(None) => { /* Source was disabled. */ }
                 // Lift error to source.
-                Err(DatamodelError::ArgumentNotFound { argument_name, span }) => errors.push(
-                    DatamodelError::new_source_argument_not_found_error(&argument_name, &src.name.name, span),
-                ),
+                Err(DatamodelError::ArgumentNotFound {
+                    argument_name,
+                    span,
+                }) => errors.push(DatamodelError::new_source_argument_not_found_error(
+                    &argument_name,
+                    &src.name.name,
+                    span,
+                )),
                 Err(err) => errors.push(err),
             }
         }
@@ -75,7 +80,9 @@ impl SourceLoader {
             // The provider given in the config block identifies the source type.
             // TODO: The second condition is a fallback to mitigate the postgres -> postgresql rename. It should be
             // renamed at some point.
-            if provider == decl.connector_type() || (decl.connector_type() == "postgresql" && provider == "postgres") {
+            if provider == decl.connector_type()
+                || (decl.connector_type() == "postgresql" && provider == "postgres")
+            {
                 return Ok(Some(decl.create(
                     // The name in front of the block is the name of the concrete instantiation.
                     &ast_source.name.name,

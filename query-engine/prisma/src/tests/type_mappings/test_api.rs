@@ -40,7 +40,10 @@ impl TestApi {
             .await
             .map_err(|err| anyhow::anyhow!("{:?}", err.data))?;
 
-        let context = PrismaContext::builder(schema.clone())
+        let dml = datamodel::parse_datamodel(&schema).unwrap();
+        let config = datamodel::parse_configuration(&schema).unwrap();
+
+        let context = PrismaContext::builder(config, dml)
             .enable_raw_queries(true)
             .force_transactions(self.is_pgbouncer)
             .build()
