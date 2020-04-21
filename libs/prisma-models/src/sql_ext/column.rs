@@ -133,8 +133,7 @@ where
     T: AsColumn,
 {
     fn as_columns(&self) -> ColumnIterator {
-        let inner: Vec<_> = self.iter().map(|x| x.as_column()).collect();
-        ColumnIterator::from(inner)
+        self.as_slice().as_columns()
     }
 }
 
