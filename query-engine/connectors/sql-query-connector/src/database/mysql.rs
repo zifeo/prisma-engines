@@ -3,9 +3,10 @@ use crate::{FromSource, SqlError};
 use async_trait::async_trait;
 use connector_interface::{
     error::{ConnectorError, ErrorKind},
-    Connection, Connector, IO,
+    Connection, Connector,
 };
 use datamodel::Source;
+use futures::future::BoxFuture;
 use quaint::{pooled::Quaint, prelude::ConnectionInfo};
 use std::time::Duration;
 
@@ -36,8 +37,8 @@ impl FromSource for Mysql {
 }
 
 impl Connector for Mysql {
-    fn get_connection<'a>(&'a self) -> IO<Box<dyn Connection + 'a>> {
-        IO::new(super::catch(&self.connection_info, async move {
+    fn get_connection<'a>(&'a self) -> BoxFuture<Box<dyn Connection + 'a>> {
+        Box::pin(super::catch(&self.connection_info, async move {
             let conn = self.pool.check_out().await.map_err(SqlError::from)?;
             let conn = SqlConnection::new(conn, &self.connection_info);
 

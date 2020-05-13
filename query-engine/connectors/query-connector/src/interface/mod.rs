@@ -3,20 +3,21 @@ mod dispatch;
 pub use dispatch::*;
 
 use crate::{Filter, QueryArguments, WriteArgs};
+use futures::future::BoxFuture;
 use prisma_models::*;
 use prisma_value::PrismaValue;
 
 pub trait Connector {
-    fn get_connection<'a>(&'a self) -> crate::IO<Box<dyn Connection + 'a>>;
+    fn get_connection<'a>(&'a self) -> BoxFuture<Box<dyn Connection + 'a>>;
 }
 
 pub trait Connection: ReadOperations + WriteOperations + Send + Sync {
-    fn start_transaction<'a>(&'a self) -> crate::IO<Box<dyn Transaction + 'a>>;
+    fn start_transaction<'a>(&'a self) -> BoxFuture<Box<dyn Transaction + 'a>>;
 }
 
 pub trait Transaction<'a>: ReadOperations + WriteOperations + Send + Sync {
-    fn commit<'b>(&'b self) -> crate::IO<'b, ()>;
-    fn rollback<'b>(&'b self) -> crate::IO<'b, ()>;
+    fn commit<'b>(&'b self) -> BoxFuture<'b, ()>;
+    fn rollback<'b>(&'b self) -> BoxFuture<'b, ()>;
 }
 
 pub enum ConnectionLike<'conn, 'tx>
@@ -87,7 +88,7 @@ pub trait ReadOperations {
         model: &'a ModelRef,
         filter: &'a Filter,
         selected_fields: &'a ModelProjection,
-    ) -> crate::IO<'a, Option<SingleRecord>>;
+    ) -> BoxFuture<'a, Option<SingleRecord>>;
 
     /// Gets multiple records from the database.
     ///
@@ -101,7 +102,7 @@ pub trait ReadOperations {
         model: &'a ModelRef,
         query_arguments: QueryArguments,
         selected_fields: &'a ModelProjection,
-    ) -> crate::IO<'a, ManyRecords>;
+    ) -> BoxFuture<'a, ManyRecords>;
 
     /// Retrieves pairs of IDs that belong together from a intermediate join
     /// table.
@@ -114,15 +115,15 @@ pub trait ReadOperations {
         &'a self,
         from_field: &'a RelationFieldRef,
         from_record_ids: &'a [RecordProjection],
-    ) -> crate::IO<'a, Vec<(RecordProjection, RecordProjection)>>;
+    ) -> BoxFuture<'a, Vec<(RecordProjection, RecordProjection)>>;
 
     // return the number of items from the `Model`, filtered by the given `QueryArguments`.
-    fn count_by_model<'a>(&'a self, model: &'a ModelRef, query_arguments: QueryArguments) -> crate::IO<'a, usize>;
+    fn count_by_model<'a>(&'a self, model: &'a ModelRef, query_arguments: QueryArguments) -> BoxFuture<'a, usize>;
 }
 
 pub trait WriteOperations {
     /// Insert a single record to the database.
-    fn create_record<'a>(&'a self, model: &'a ModelRef, args: WriteArgs) -> crate::IO<RecordProjection>;
+    fn create_record<'a>(&'a self, model: &'a ModelRef, args: WriteArgs) -> BoxFuture<RecordProjection>;
 
     /// Update records in the `Model` with the given `WriteArgs` filtered by the
     /// `Filter`.
@@ -131,10 +132,10 @@ pub trait WriteOperations {
         model: &'a ModelRef,
         record_filter: RecordFilter,
         args: WriteArgs,
-    ) -> crate::IO<Vec<RecordProjection>>;
+    ) -> BoxFuture<Vec<RecordProjection>>;
 
     /// Delete records in the `Model` with the given `Filter`.
-    fn delete_records<'a>(&'a self, model: &'a ModelRef, record_filter: RecordFilter) -> crate::IO<usize>;
+    fn delete_records<'a>(&'a self, model: &'a ModelRef, record_filter: RecordFilter) -> BoxFuture<usize>;
 
     // We plan to remove the methods below in the future. We want emulate them with the ones above. Those should suffice.
 
@@ -144,7 +145,7 @@ pub trait WriteOperations {
         field: &'a RelationFieldRef,
         parent_id: &'a RecordProjection,
         child_ids: &'a [RecordProjection],
-    ) -> crate::IO<()>;
+    ) -> BoxFuture<()>;
 
     /// Disconnect the children from the parent.
     fn disconnect<'a>(
@@ -152,9 +153,9 @@ pub trait WriteOperations {
         field: &'a RelationFieldRef,
         parent_id: &'a RecordProjection,
         child_ids: &'a [RecordProjection],
-    ) -> crate::IO<()>;
+    ) -> BoxFuture<()>;
 
     /// Execute the raw query in the database as-is. The `parameters` are
     /// parameterized values for databases that support prepared statements.
-    fn execute_raw<'a>(&'a self, query: String, parameters: Vec<PrismaValue>) -> crate::IO<serde_json::Value>;
+    fn execute_raw<'a>(&'a self, query: String, parameters: Vec<PrismaValue>) -> BoxFuture<serde_json::Value>;
 }
