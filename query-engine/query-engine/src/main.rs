@@ -56,38 +56,7 @@ async fn main() -> Result<(), AnyError> {
         }
         Err(PrismaError::InvocationError(_)) => {
             set_panic_hook()?;
-            let ip = opts.host.parse().expect("Host was not a valid IP address");
-            let address = SocketAddr::new(ip, opts.port);
-
-            eprintln!("Printing to stderr for debugging");
-            eprintln!("Listening on {}:{}", opts.host, opts.port);
-
-            let create_builder = move || {
-                let config = opts.configuration(false)?;
-                let datamodel = opts.datamodel(false)?;
-
-                PrismaResult::<HttpServerBuilder>::Ok(
-                    HttpServer::builder(config, datamodel)
-                        .legacy(opts.legacy)
-                        .enable_raw_queries(opts.enable_raw_queries)
-                        .enable_playground(opts.enable_playground),
-                )
-            };
-
-            let builder = match create_builder() {
-                Err(err) => {
-                    info!("Encountered error during initialization:");
-                    err.render_as_json().expect("error rendering");
-                    process::exit(1);
-                }
-                Ok(builder) => builder,
-            };
-
-            if let Err(err) = builder.build_and_run(address).await {
-                info!("Encountered error during initialization:");
-                err.render_as_json().expect("error rendering");
-                process::exit(1);
-            };
+            start_server(opts).await
         }
         Err(err) => {
             info!("Encountered error during initialization:");
@@ -154,4 +123,43 @@ fn set_panic_hook() -> Result<(), AnyError> {
     }
 
     Ok(())
+}
+
+async fn start_server(opts: PrismaOpt) {
+    start_http_server(opts).await
+}
+
+async fn start_http_server(opts: PrismaOpt) {
+    let ip = opts.host.parse().expect("Host was not a valid IP address");
+    let address = SocketAddr::new(ip, opts.port);
+
+    eprintln!("Printing to stderr for debugging");
+    eprintln!("Listening on {}:{}", opts.host, opts.port);
+
+    let create_builder = move || {
+        let config = opts.configuration(false)?;
+        let datamodel = opts.datamodel(false)?;
+
+        PrismaResult::<HttpServerBuilder>::Ok(
+            HttpServer::builder(config, datamodel)
+                .legacy(opts.legacy)
+                .enable_raw_queries(opts.enable_raw_queries)
+                .enable_playground(opts.enable_playground),
+        )
+    };
+
+    let builder = match create_builder() {
+        Err(err) => {
+            info!("Encountered error during initialization:");
+            err.render_as_json().expect("error rendering");
+            process::exit(1);
+        }
+        Ok(builder) => builder,
+    };
+
+    if let Err(err) = builder.build_and_run(address).await {
+        info!("Encountered error during initialization:");
+        err.render_as_json().expect("error rendering");
+        process::exit(1);
+    };
 }
