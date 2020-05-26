@@ -10,10 +10,12 @@ sql = ["sql-connector"]
 graphql = ["graphql-parser"]
 
 [dependencies]
-futures = "0.3"
+futures = { version = "0.3", features = ["compat"] }
 http = "0.2"
 hyper = "0.13"
 tokio = { version = "=0.2.13", features = ["rt-threaded", "macros"] }
+jsonrpc-ws-server = "14.1"
+jsonrpc-core = "14.1"
 
 async-trait = "0.1"
 prisma-inflector = { path = "../../libs/prisma-inflector" }

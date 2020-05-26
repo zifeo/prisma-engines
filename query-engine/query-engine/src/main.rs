@@ -3,12 +3,17 @@ extern crate tracing;
 #[macro_use]
 extern crate rust_embed;
 
+use crate::context::PrismaContext;
+use crate::request_handlers::{GraphQlBody, GraphQlRequestHandler};
 use cli::*;
 use error::*;
+use futures::TryFutureExt;
 use once_cell::sync::Lazy;
 use opt::*;
 use request_handlers::{PrismaRequest, PrismaResponse, RequestHandler};
 use server::{HttpServer, HttpServerBuilder};
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::{convert::TryFrom, error::Error, net::SocketAddr, process};
 use structopt::StructOpt;
 use tracing::subscriber;
@@ -126,7 +131,13 @@ fn set_panic_hook() -> Result<(), AnyError> {
 }
 
 async fn start_server(opts: PrismaOpt) {
-    start_http_server(opts).await
+    // let server_impl = "http-tcp";
+    let server_impl = "json-rpc-ws";
+    match server_impl {
+        "http-tcp" => start_http_server(opts).await,
+        "json-rpc-ws" => start_json_rpc_ws_server(opts).await,
+        _ => panic!("Unknown server impl {}", server_impl),
+    }
 }
 
 async fn start_http_server(opts: PrismaOpt) {
@@ -162,4 +173,52 @@ async fn start_http_server(opts: PrismaOpt) {
         err.render_as_json().expect("error rendering");
         process::exit(1);
     };
+}
+
+async fn start_json_rpc_ws_server(opts: PrismaOpt) {
+    use futures::FutureExt;
+    use jsonrpc_core::Params;
+    use jsonrpc_ws_server::jsonrpc_core::IoHandler;
+    use jsonrpc_ws_server::*;
+    use serde_json::Value;
+
+    let config = opts.configuration(false).unwrap();
+    let datamodel = opts.datamodel(false).unwrap();
+    let ctx = PrismaContext::builder(config, datamodel).build().await.unwrap();
+    let arcified_ctx = Arc::new(ctx);
+
+    let mut io = IoHandler::new();
+    io.add_method("say_hello", |_params| Ok(Value::String("hello".into())));
+    io.add_method("query", move |params: Params| {
+        let cloned = arcified_ctx.clone();
+        let fut = async move {
+            handle_rpc_call(params, &cloned)
+                .await
+                .map_err(|_| jsonrpc_core::Error::internal_error())
+        };
+        fut.boxed().compat()
+    });
+
+    let server = ServerBuilder::new(io)
+        .start(&"0.0.0.0:3030".parse().unwrap())
+        .expect("Server must start with no issues");
+
+    server.wait().unwrap()
+}
+
+async fn handle_rpc_call(
+    params: jsonrpc_core::Params,
+    ctx: &Arc<PrismaContext>,
+) -> Result<serde_json::Value, anyhow::Error> {
+    let body: GraphQlBody = params.clone().parse().unwrap();
+    let req = PrismaRequest {
+        body,
+        path: "".to_string(),
+        headers: HashMap::new(),
+    };
+
+    let result = GraphQlRequestHandler.handle(req, &ctx).await;
+    let json = serde_json::to_value(&result).unwrap();
+
+    Ok(json)
 }
