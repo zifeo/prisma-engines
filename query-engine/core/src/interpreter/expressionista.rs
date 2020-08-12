@@ -8,7 +8,7 @@ use std::{collections::VecDeque, convert::TryInto};
 pub struct Expressionista;
 
 /// Helper accumulator struct.
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct IfNodeAcc {
     then: Option<(EdgeRef, NodeRef)>,
     _else: Option<(EdgeRef, NodeRef)>,
@@ -233,6 +233,8 @@ impl Expressionista {
                 acc
             });
 
+        println!("[{}] {:?}", node.id(), if_node_info);
+
         let then_pair = if_node_info
             .then
             .expect("Expected if-node to always have a then edge to another node.");
@@ -246,9 +248,9 @@ impl Expressionista {
             .collect::<InterpretationResult<Vec<_>>>()?;
 
         let child_expressions = Self::process_children(graph, if_node_info.other)?;
-
         let node_id = node.id();
         let node = graph.pluck_node(node);
+
         let into_expr = Box::new(move |node: Node| {
             let flow: Flow = node.try_into()?;
 
