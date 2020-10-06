@@ -119,6 +119,7 @@ fn native_type_tiny_int_should_work_with_mysql() {
         model User {
             id    Int      @id
             test  Int  @db.TinyInt(1)
+            bool Boolean @db.TinyInt(1)
         }
     "#;
 
@@ -126,13 +127,14 @@ fn native_type_tiny_int_should_work_with_mysql() {
 
     let user_model = datamodel.assert_has_model("User");
 
-    user_model.assert_has_scalar_field("test");
-
     let sft = user_model.assert_has_scalar_field("test").assert_native_type();
+    let bool_sft = user_model.assert_has_scalar_field("bool").assert_native_type();
 
     let mysql_type: MySqlType = sft.deserialize_native_type();
+    let mysql_bool_type: MySqlType = bool_sft.deserialize_native_type();
 
     assert_eq!(mysql_type, MySqlType::TinyInt(1));
+    assert_eq!(mysql_bool_type, MySqlType::TinyInt(1));
 }
 
 #[test]
