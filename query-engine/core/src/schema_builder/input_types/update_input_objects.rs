@@ -25,7 +25,10 @@ pub(crate) fn update_many_input_type(ctx: &mut BuilderContext, model: &ModelRef)
     let object_name = format!("{}UpdateManyMutationInput", model.name);
     return_cached_input!(ctx, &object_name);
 
-    let input_fields = scalar_input_fields_for_update(ctx, model);
+    let mut input_fields = scalar_input_fields_for_update(ctx, model);
+    let mut relational_fields = relation_input_fields_for_update_many(ctx, model, None);
+    input_fields.append(&mut relational_fields);
+
     let input_object = Arc::new(input_object_type(object_name.clone(), input_fields));
 
     ctx.cache_input_type(object_name, input_object.clone());
@@ -112,6 +115,58 @@ fn operations_object_type(
 /// This recurses into create_input_type (via nested_create_input_field).
 /// Todo: This code is fairly similar to "create" relation computation. Let's see if we can dry it up.
 fn relation_input_fields_for_update(
+    ctx: &mut BuilderContext,
+    model: &ModelRef,
+    parent_field: Option<&RelationFieldRef>,
+) -> Vec<InputField> {
+    model
+        .fields()
+        .relation()
+        .into_iter()
+        .filter_map(|rf| {
+            let related_model = rf.related_model();
+            let related_field = rf.related_field();
+
+            // Compute input object name
+            let arity_part = match (rf.is_list, rf.is_required) {
+                (true, _) => "Many",
+                (false, true) => "OneRequired",
+                (false, false) => "One",
+            };
+
+            let without_part = format!("Without{}", capitalize(&related_field.name));
+
+            let input_name = format!("{}Update{}{}Input", related_model.name, arity_part, without_part);
+            let field_is_opposite_relation_field =
+                parent_field.filter(|pf| pf.related_field().name == rf.name).is_some();
+
+            if field_is_opposite_relation_field {
+                None
+            } else {
+                let input_object = match ctx.get_input_type(&input_name) {
+                    Some(t) => t,
+                    None => {
+                        let input_object = Arc::new(init_input_object_type(input_name.clone()));
+                        ctx.cache_input_type(input_name, input_object.clone());
+
+                        // Enqueue the nested update input for its fields to be
+                        // created at a later point, to avoid recursing too deep
+                        // (that has caused stack overflows on large schemas in
+                        // the past).
+                        ctx.nested_update_inputs_queue
+                            .push((Arc::clone(&input_object), Arc::clone(&rf)));
+
+                        Arc::downgrade(&input_object)
+                    }
+                };
+
+                Some(input_field(rf.name.clone(), InputType::object(input_object), None).optional())
+            }
+        })
+        .collect()
+}
+
+fn relation_input_fields_for_update_many(
     ctx: &mut BuilderContext,
     model: &ModelRef,
     parent_field: Option<&RelationFieldRef>,
