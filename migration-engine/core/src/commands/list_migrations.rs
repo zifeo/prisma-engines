@@ -18,40 +18,31 @@ impl<'a> MigrationCommand for ListMigrationsCommand {
     {
         let migration_persistence = engine.connector().migration_persistence();
 
-        let result: CoreResult<Self::Output> = migration_persistence
+        let migrations: Self::Output = migration_persistence
             .load_all()
             .await?
             .into_iter()
-            .map(|migration| convert_migration_to_list_migration_steps_output(&engine, migration))
+            .map(convert_migration_to_list_migration_steps_output)
             .collect();
 
-        if let Ok(migrations) = result.as_ref() {
-            tracing::info!(
-                "Returning {migrations_count} migrations ({pending_count} pending).",
-                migrations_count = migrations.len(),
-                pending_count = migrations.iter().filter(|mig| mig.status.is_pending()).count(),
-            );
-        }
+        tracing::info!(
+            "Returning {migrations_count} migrations ({pending_count} pending).",
+            migrations_count = migrations.len(),
+            pending_count = migrations.iter().filter(|mig| mig.status.is_pending()).count(),
+        );
 
-        result
+        Ok(migrations)
     }
 }
 
-pub fn convert_migration_to_list_migration_steps_output<C, D>(
-    _engine: &MigrationEngine<C, D>,
-    migration: Migration,
-) -> CoreResult<ListMigrationsOutput>
-where
-    C: MigrationConnector<DatabaseMigration = D>,
-    D: DatabaseMigrationMarker + 'static,
-{
-    Ok(ListMigrationsOutput {
+pub fn convert_migration_to_list_migration_steps_output(migration: Migration) -> ListMigrationsOutput {
+    ListMigrationsOutput {
         id: migration.name,
         datamodel_steps: migration.datamodel_steps,
         database_steps: vec![],
         status: migration.status,
         datamodel: migration.datamodel_string,
-    })
+    }
 }
 
 #[derive(Debug, Serialize)]
