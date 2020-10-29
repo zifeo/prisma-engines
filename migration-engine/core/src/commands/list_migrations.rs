@@ -38,30 +38,17 @@ impl<'a> MigrationCommand for ListMigrationsCommand {
 }
 
 pub fn convert_migration_to_list_migration_steps_output<C, D>(
-    engine: &MigrationEngine<C, D>,
+    _engine: &MigrationEngine<C, D>,
     migration: Migration,
 ) -> CoreResult<ListMigrationsOutput>
 where
     C: MigrationConnector<DatabaseMigration = D>,
     D: DatabaseMigrationMarker + 'static,
 {
-    let connector = engine.connector();
-    let database_migration = migration.database_migration;
-
-    let database_steps_json = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        match connector.deserialize_database_migration(database_migration) {
-            Some(database_migration) => connector
-                .database_migration_step_applier()
-                .render_steps_pretty(&database_migration)
-                .unwrap_or_else(|_| Vec::new()),
-            None => vec![],
-        }
-    }));
-
     Ok(ListMigrationsOutput {
         id: migration.name,
         datamodel_steps: migration.datamodel_steps,
-        database_steps: database_steps_json.unwrap_or_else(|_| Vec::new()),
+        database_steps: vec![],
         status: migration.status,
         datamodel: migration.datamodel_string,
     })
