@@ -6,8 +6,8 @@ import util._
 
 class NonUniqueIndexUsageSpec extends FlatSpec with Matchers with ApiSpecBase with SchemaBaseV11 {
   // Validates fix for
-  // https://github.com/prisma/prisma/issues/3869
-  // https://github.com/prisma/prisma-client-js/issues/71
+  // - https://github.com/prisma/prisma/issues/3869
+  // - https://github.com/prisma/prisma-client-js/issues/71
 
   override def runOnlyForCapabilities: Set[ConnectorCapability] = Set(JoinRelationLinksCapability)
 

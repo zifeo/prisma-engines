@@ -52,6 +52,7 @@ fn handle_compound_field(fields: Vec<ScalarFieldRef>, value: ParsedInputValue) -
 
 /// Extracts a regular filter potentially matching many records.
 pub fn extract_filter(value_map: ParsedInputMap, model: &ModelRef) -> QueryGraphBuilderResult<Filter> {
+    dbg!(&value_map);
     let filters = value_map
         .into_iter()
         .map(|(key, value): (String, ParsedInputValue)| {

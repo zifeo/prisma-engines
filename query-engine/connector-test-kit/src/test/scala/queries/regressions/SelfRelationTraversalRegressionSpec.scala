@@ -4,19 +4,19 @@ import org.scalatest.{FlatSpec, Matchers}
 import util.ConnectorCapability.JoinRelationLinksCapability
 import util._
 
-class Prisma_3078Spec extends FlatSpec with Matchers with ApiSpecBase with SchemaBaseV11 {
-  // validates fix for
-  //https://github.com/prisma/prisma/issues/3078
-  //https://github.com/prisma/prisma-client-js/issues/550
-
-  // The relationfilter logic for Selfrelations was sensitive to the side from which the filter traversed as well as the
-  // naming of the relationfields since this fed into the RelationSide logic. This tests traversal from both sides as well
+class SelfRelationTraversalRegressionSpec extends FlatSpec with Matchers with ApiSpecBase with SchemaBaseV11 {
+  // Validates fix for:
+  // - https://github.com/prisma/prisma/issues/3078
+  // - https://github.com/prisma/prisma-client-js/issues/550
+  //
+  // Summary:
+  // The relation filter logic for self-relations was sensitive to the side from which the filter traversed as well as the
+  // naming of the relation fields since this fed into the `RelationSide` logic. This tests traversal from both sides as well
   // as switching the lexicographic order of the relation fields.
 
   override def runOnlyForCapabilities: Set[ConnectorCapability] = Set(JoinRelationLinksCapability)
 
   "A relation filter on a 1:1 self relation " should "work" taggedAs (IgnoreMsSql) in {
-
     for (fieldName <- Vector("field_a", "field_z")) {
       val project = ProjectDsl.fromString {
         s"""

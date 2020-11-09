@@ -4,7 +4,14 @@ import org.scalatest.{FlatSpec, Matchers}
 import util._
 
 class PaginationRegressionSpec extends FlatSpec with Matchers with ApiSpecBase {
-  "[prisma/2855] Duplicate ordering keys on non-sequential IDs" should "still allow paging through records predictably" in {
+  // Validates fix for:
+  // - https://github.com/prisma/prisma/issues/2855
+  // - https://github.com/prisma/prisma/issues/3505
+  //
+  // Summary:
+  // Prisma needs to be able to page predictably through records, even if ordering provided contains duplicates or null.
+
+  "Duplicate ordering keys on non-sequential IDs" should "still allow paging through records predictably" in {
     // ID on ModelB is non-sequential.
     val project = SchemaDsl.fromStringV11() {
       """
@@ -136,7 +143,7 @@ class PaginationRegressionSpec extends FlatSpec with Matchers with ApiSpecBase {
     ) should contain(result.toString())
   }
 
-  "[prisma/3505][Case 2] Paging and ordering with potential null values NOT ON a null row" should "still allow paging through records predictably" in {
+  "[Scenario 2] Paging and ordering with potential null values NOT ON a null row" should "still allow paging through records predictably" in {
     // "Not on null row" means that the cursor row does not contain a null value for the ordering field, in this case row 2.
     // However, other rows might still have nulls, those must be taken into consideration.
     val project = SchemaDsl.fromStringV11() {
