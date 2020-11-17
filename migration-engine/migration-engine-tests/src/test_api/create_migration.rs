@@ -159,12 +159,17 @@ pub struct MigrationAssertion<'a> {
 
 impl MigrationAssertion<'_> {
     pub fn assert_contents(self, expected_contents: &str) -> AssertionResult<Self> {
-        let migration_file_path = self.path.join("migration.sql");
-        let contents: String = std::fs::read_to_string(&migration_file_path)
-            .with_context(|| format!("Trying to read migration file at {:?}", migration_file_path))?;
+        let contents: &String = &self.script();
 
         assert_eq!(expected_contents, contents);
 
         Ok(self)
+    }
+
+    pub fn script(&self) -> String {
+        let migration_file_path = self.path.join("migration.sql");
+        std::fs::read_to_string(&migration_file_path)
+            .with_context(|| format!("Trying to read migration file at {:?}", migration_file_path))
+            .unwrap()
     }
 }

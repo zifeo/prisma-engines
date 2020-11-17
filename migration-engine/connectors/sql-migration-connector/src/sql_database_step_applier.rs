@@ -30,6 +30,11 @@ impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
     }
 
     fn render_script(&self, database_migration: &SqlMigration, diagnostics: &DestructiveChangeDiagnostics) -> String {
+        const SQL_COMMENT: &'static str = "-- ";
+        const NEWLINE: char = '\n';
+        const SPACE: char = ' ';
+        const STATEMENT_SEPARATOR: &'static str = "@@PrismaRulez@@";
+
         if database_migration.is_empty() {
             return "-- This is an empty migration.".to_string();
         }
@@ -44,13 +49,13 @@ impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
             for warning in &diagnostics.warnings {
                 script.push_str("  - ");
                 script.push_str(&warning.description);
-                script.push('\n');
+                script.push(NEWLINE);
             }
 
             for unexecutable in &diagnostics.unexecutable_migrations {
                 script.push_str("  - ");
                 script.push_str(&unexecutable.description);
-                script.push('\n');
+                script.push(NEWLINE);
             }
 
             script.push_str("\n*/\n")
@@ -64,9 +69,12 @@ impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
             );
 
             if !statements.is_empty() {
-                script.push_str("-- ");
+                script.push_str(SQL_COMMENT);
+                script.push_str(STATEMENT_SEPARATOR);
+                script.push(NEWLINE);
+                script.push_str(SQL_COMMENT);
                 script.push_str(step.description());
-                script.push('\n');
+                script.push(NEWLINE);
 
                 for statement in statements {
                     script.push_str(&statement);
@@ -79,7 +87,17 @@ impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
     }
 
     async fn apply_script(&self, script: &str) -> ConnectorResult<()> {
-        Ok(self.conn().raw_cmd(script).await?)
+        let statements: Vec<&str> = script.split("-- @@PRISMA RULES@@\n").collect();
+
+        //what if stuff is before first separator???
+        //what if there is no separator???
+        for statement in statements.iter().skip(1) {
+            println!("{}", statement);
+
+            self.conn().raw_cmd(statement).await?
+        }
+
+        Ok(())
     }
 }
 
