@@ -7,7 +7,10 @@ use migration_connector::{
     ConnectorResult, DatabaseMigrationMarker, DatabaseMigrationStepApplier, DestructiveChangeDiagnostics,
     PrettyDatabaseMigrationStep,
 };
+use once_cell::sync::Lazy;
+use regex::Regex;
 use sql_schema_describer::{walkers::SqlSchemaExt, SqlSchema};
+use std::ops::Index;
 
 #[async_trait::async_trait]
 impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
@@ -30,10 +33,7 @@ impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
     }
 
     fn render_script(&self, database_migration: &SqlMigration, diagnostics: &DestructiveChangeDiagnostics) -> String {
-        const SQL_COMMENT: &'static str = "-- ";
         const NEWLINE: char = '\n';
-        const SPACE: char = ' ';
-        const STATEMENT_SEPARATOR: &'static str = "@@PrismaRulez@@";
 
         if database_migration.is_empty() {
             return "-- This is an empty migration.".to_string();
@@ -69,11 +69,7 @@ impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
             );
 
             if !statements.is_empty() {
-                script.push_str(SQL_COMMENT);
-                script.push_str(STATEMENT_SEPARATOR);
-                script.push(NEWLINE);
-                script.push_str(SQL_COMMENT);
-                script.push_str(step.description());
+                script.push_str(format!("-- [Step: {}]", step.description()).as_str());
                 script.push(NEWLINE);
 
                 for statement in statements {
@@ -87,13 +83,25 @@ impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
     }
 
     async fn apply_script(&self, script: &str) -> ConnectorResult<()> {
-        let statements: Vec<&str> = script.split("-- @@PRISMA RULES@@\n").collect();
+        static STEP_SEPARATOR_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"^-- \[Step: (.*)\]$"#).unwrap());
 
-        //what if stuff is before first separator???
-        //what if there is no separator???
-        for statement in statements.iter().skip(1) {
-            println!("{}", statement);
+        let lines = script.lines().enumerate();
 
+        let statements = lines.fold(vec![(0, "".to_string(), "".to_string())], |mut acc, (index, line)| {
+            match STEP_SEPARATOR_RE.captures(line) {
+                Some(t) if t.get(1).is_some() => acc.push((index, t.index(1).to_string(), "".to_string())),
+                _ => {
+                    acc.last_mut().unwrap().2.push_str(line);
+                    acc.last_mut().unwrap().2.push('\n')
+                }
+            };
+            acc
+        });
+
+        for (index, description, statement) in statements.iter().skip(1) {
+            println!("{} {} \n {}", index, description, statement);
+
+            //catch error, unite with line information from statement
             self.conn().raw_cmd(statement).await?
         }
 

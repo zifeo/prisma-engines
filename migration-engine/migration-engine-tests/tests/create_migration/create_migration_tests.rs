@@ -323,56 +323,54 @@ async fn create_enum_step_only_rendered_when_needed(api: &TestApi) -> TestResult
     Ok(())
 }
 
-// #[test_each_connector(tags("postgres"))]
-// async fn test_separator(api: &TestApi) -> TestResult {
-//     let dm = r#"
-//         model Cat {
-//             id      Int @id
-//             mood    String
-//         }
-//
-//          model Dog {
-//             id      Int @id
-//             mood    String
-//         }
-//
-//     "#;
-//
-//     let dir = api.create_migrations_directory()?;
-//
-//     let mut script = "".to_string();
-//     api.create_migration("create-cats", dm, &dir)
-//         .send()
-//         .await?
-//         .assert_migration_directories_count(1)?
-//         .assert_migration("create-cats", |migration| {
-//             let expected_script = indoc! {
-//                 r#"
-//                         -- @STEP@: CreateTable //comment maybe add more info to the description tablename commentname etc..
-//                         CREATE TABLE "Cat" (
-//                             "id" INTEGER NOT NULL,
-//                             "mood" TEXT NOT NULL,
-//
-//                             PRIMARY KEY ("id")
-//                         );
-//
-//                         -- @@PrismaRulez@@
-//                         -- CreateTable
-//                         CREATE TABLE "Dog" (
-//                             "id" INTEGER NOT NULL,
-//                             "mood" TEXT NOT NULL,
-//
-//                             PRIMARY KEY ("id")
-//                         );
-//
-//                 "#
-//             };
-//
-//             script = migration.script();
-//             migration.assert_contents(expected_script)
-//         })?;
-//
-//     let res = api.apply_script(script).await.unwrap();
-//
-//     Ok(())
-// }
+#[test_each_connector(tags("postgres"))]
+async fn test_separator(api: &TestApi) -> TestResult {
+    let dm = r#"
+        model Cat {
+            id      Int @id
+            mood    String
+        }
+
+         model Dog {
+            id      Int @id
+            mood    String
+        }
+
+    "#;
+
+    let dir = api.create_migrations_directory()?;
+
+    let mut script = "".to_string();
+    api.create_migration("create-cats", dm, &dir)
+        .send()
+        .await?
+        .assert_migration_directories_count(1)?
+        .assert_migration("create-cats", |migration| {
+            let expected_script = indoc! {
+                r#"
+                        -- [Step: CreateTable]
+                        CREATE TABLE "Cat" (
+                            "id" INTEGER NOT NULL,
+                            "mood" TEXT NOT NULL,
+    
+                            PRIMARY KEY ("id")
+                        );
+                        -- [Step: CreateTable]
+                        CREATE TABLE "Dog" (
+                            "id" INTEGER NOT NULL,
+                            "mood" TEXT NOT NULL,
+    
+                            PRIMARY KEY ("id")
+                        );
+                "#
+            };
+
+            script = migration.script();
+            migration.assert_contents(expected_script)
+        })?;
+
+    api.apply_script(script).await.unwrap();
+
+    assert!(false);
+    Ok(())
+}
