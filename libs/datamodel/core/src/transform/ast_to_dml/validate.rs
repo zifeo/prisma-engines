@@ -863,7 +863,8 @@ impl<'a> Validator<'a> {
             if is_self_relation && field.is_required() && related_field.is_required() {
                 errors.push_error(DatamodelError::new_field_validation_error(
                         &format!(
-                            "The relation fields `{}` and `{}` on Model `{}` are both required. This is not allowed for a self relation because it would not be possible to create a record.",
+                            "The relation fields `{}` and `{}` on Model `{}` are both required. 
+                            t allowed for a self relation because it would not be possible to create a record.",
                             &field.name, &related_field.name, &model.name,
                         ),
                         &model.name,
@@ -946,8 +947,8 @@ impl<'a> Validator<'a> {
                     if field.is_required() && !related_field_rel_info.to_fields.is_empty() {
                         errors.push_error(DatamodelError::new_attribute_validation_error(
                             &format!(
-                                "The relation field `{}` on Model `{}` is required. This is invalid as it is not possible to enforce this constraint at the database level. Please make it optional instead.",
-                                &field.name, &model.name,
+                                "The relation field `{}` on Model `{}` is required. This is no longer valid because it's not possible to enforce this constraint at the database level. Change field `{}` on Model `{}` to `{}?` to fix this.",
+                                &field.name, &model.name, &field.name, &model.name, &field.name,
                             ),
                             RELATION_ATTRIBUTE_NAME,
                             field_span,
