@@ -1064,7 +1064,7 @@ async fn adding_a_many_to_many_relation_with_custom_name_must_work(api: &TestApi
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(log = "debug")]
 async fn adding_an_inline_relation_must_result_in_a_foreign_key_in_the_model_table(api: &TestApi) -> TestResult {
     let dm1 = r#"
         model A {

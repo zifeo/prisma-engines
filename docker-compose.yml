@@ -80,6 +80,15 @@ services:
       - databases
     tmpfs: /pgtmpfs12
 
+  cockroach:
+    image: cockroachdb/cockroach-unstable:v21.1.0-alpha.1
+    restart: always
+    command: start-single-node --insecure
+    ports:
+      - "5436:26257"
+    networks:
+      - databases
+
   mysql-5-6:
     image: mysql:5.6
     command: mysqld

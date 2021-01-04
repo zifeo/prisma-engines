@@ -228,6 +228,22 @@ pub async fn postgres13_test_api(args: TestAPIArgs) -> TestApi {
     }
 }
 
+pub async fn cockroachdb_test_api(args: TestAPIArgs) -> TestApi {
+    let db_name = args.test_function_name;
+    let url = postgres_13_url(db_name);
+    let connection_info = ConnectionInfo::from_url(&url).unwrap();
+
+    let migration_api = MigrationApi::new(postgres_migration_connector(&url).await);
+
+    let config = postgres_13_test_config(db_name);
+
+    TestApi {
+        connection_info,
+        migration_api,
+        config,
+    }
+}
+
 pub async fn sqlite_test_api(args: TestAPIArgs) -> TestApi {
     let db_name = args.test_function_name;
     let url = sqlite_test_url(db_name);

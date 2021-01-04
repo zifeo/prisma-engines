@@ -28,7 +28,7 @@ async fn adding_a_model_for_an_existing_table_must_work(api: &TestApi) -> TestRe
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(log = "debug")]
 async fn removing_a_model_for_a_table_that_is_already_deleted_must_work(api: &TestApi) -> TestResult {
     let dm1 = r#"
         model Blog {

@@ -89,6 +89,15 @@ pub fn pgbouncer_url(db_name: &str) -> String {
     )
 }
 
+pub fn cockroachdb_url(db_name: &str) -> String {
+    let (host, port) = db_host_and_port_cockroachdb();
+
+    format!(
+        "postgresql://root@{}:{}/{}?schema={}&statement_cache_size=0&socket_timeout=60",
+        host, port, db_name, SCHEMA_NAME
+    )
+}
+
 pub fn postgres_10_url(db_name: &str) -> String {
     let (host, port) = db_host_and_port_postgres_10();
 
@@ -241,6 +250,12 @@ fn db_host_and_port_postgres_13() -> (&'static str, usize) {
     match std::env::var("IS_BUILDKITE") {
         Ok(_) => ("test-db-postgres-13", 5432),
         Err(_) => ("127.0.0.1", 5435),
+    }
+}
+
+fn db_host_and_port_cockroachdb() -> (&'static str, usize) {
+    match std::env::var("IS_BUILDKITE") {
+        _ => ("127.0.0.1", 5436),
     }
 }
 

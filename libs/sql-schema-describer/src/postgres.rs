@@ -190,19 +190,19 @@ impl SqlSchemaDescriber {
             let table_name = col.get_expect_string("table_name");
             let name = col.get_expect_string("column_name");
 
-            let is_identity_str = col.get_expect_string("is_identity").to_lowercase();
-
-            let is_identity = match is_identity_str.as_str() {
-                "no" => false,
-                "yes" => true,
-                _ => panic!("unrecognized is_identity variant '{}'", is_identity_str),
+            let is_identity = match col.get("is_identity") {
+                Some(quaint::Value::Text(Some(s))) if s.as_ref().eq_ignore_ascii_case("yes") => true,
+                Some(quaint::Value::Text(Some(s))) if s.as_ref().eq_ignore_ascii_case("no") => false,
+                Some(quaint::Value::Text(None)) => false, // can be the case on cockroach
+                Some(quaint::Value::Boolean(Some(b))) => *b,
+                other => panic!("Could not get the is_identity column. ({:?})", other),
             };
 
             let tpe = get_column_type(&col, enums);
             let default = Self::get_default_value(&col, &tpe, sequences);
 
             let auto_increment =
-                is_identity || matches!(default.as_ref().map(|d| d.kind()), Some(DefaultKind::SEQUENCE(_)));
+                is_identity || matches!(default.as_ref().map(|d| d.kind()), Some(DefaultKind::DBGENERATED(s)) if s == "unique_rowid()") || matches!(default.as_ref().map(|d| d.kind()), Some(DefaultKind::SEQUENCE(_)));
 
             let col = Column {
                 name,
@@ -331,8 +331,16 @@ impl SqlSchemaDescriber {
             let referenced_table = row.get_expect_string("parent_table");
             let referenced_column = row.get_expect_string("parent_column");
             let table_name = row.get_expect_string("table_name");
-            let confdeltype = row.get_expect_char("confdeltype");
-            let confupdtype = row.get_expect_char("confupdtype");
+            let confdeltype = match row.get("confdeltype") {
+                Some(quaint::Value::Text(Some(c))) => c.clone().into_owned(),
+                Some(quaint::Value::Char(Some(c))) => c.to_string(),
+                other => panic!("Failed to get confdeltype from row ({:?})", other),
+            };
+            let confupdtype = match row.get("confupdtype") {
+                Some(quaint::Value::Text(Some(c))) => c.clone().into_owned(),
+                Some(quaint::Value::Char(Some(c))) => c.to_string(),
+                other => panic!("Failed to get confdeltype from row ({:?})", other),
+            };
             let constraint_name = row.get_expect_string("constraint_name");
 
             let referenced_schema_name = row.get_expect_string("referenced_schema_name");
@@ -345,20 +353,20 @@ impl SqlSchemaDescriber {
                 }));
             }
 
-            let on_delete_action = match confdeltype {
-                'a' => ForeignKeyAction::NoAction,
-                'r' => ForeignKeyAction::Restrict,
-                'c' => ForeignKeyAction::Cascade,
-                'n' => ForeignKeyAction::SetNull,
-                'd' => ForeignKeyAction::SetDefault,
+            let on_delete_action = match confdeltype.as_str() {
+                "a" => ForeignKeyAction::NoAction,
+                "r" => ForeignKeyAction::Restrict,
+                "c" => ForeignKeyAction::Cascade,
+                "n" => ForeignKeyAction::SetNull,
+                "d" => ForeignKeyAction::SetDefault,
                 _ => panic!(format!("unrecognized foreign key action '{}'", confdeltype)),
             };
-            let on_update_action = match confupdtype {
-                'a' => ForeignKeyAction::NoAction,
-                'r' => ForeignKeyAction::Restrict,
-                'c' => ForeignKeyAction::Cascade,
-                'n' => ForeignKeyAction::SetNull,
-                'd' => ForeignKeyAction::SetDefault,
+            let on_update_action = match confupdtype.as_str() {
+                "a" => ForeignKeyAction::NoAction,
+                "r" => ForeignKeyAction::Restrict,
+                "c" => ForeignKeyAction::Cascade,
+                "n" => ForeignKeyAction::SetNull,
+                "d" => ForeignKeyAction::SetDefault,
                 _ => panic!(format!("unrecognized foreign key action '{}'", confdeltype)),
             };
             match intermediate_fks.get_mut(&id) {

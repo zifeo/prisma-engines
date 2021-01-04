@@ -258,6 +258,10 @@ pub async fn postgres13_test_api(args: TestAPIArgs) -> TestApi {
     test_api_helper_for_postgres(postgres_13_url(args.test_function_name), args).await
 }
 
+pub async fn cockroachdb_test_api(args: TestAPIArgs) -> TestApi {
+    test_api_helper_for_postgres(cockroachdb_url(args.test_function_name), args).await
+}
+
 pub async fn test_api_helper_for_postgres(url: String, args: TestAPIArgs) -> TestApi {
     let database = test_setup::create_postgres_database(&url.parse().unwrap())
         .await

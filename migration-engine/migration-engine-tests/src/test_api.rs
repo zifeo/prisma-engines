@@ -442,6 +442,18 @@ pub async fn postgres13_test_api(args: TestAPIArgs) -> TestApi {
     }
 }
 
+pub async fn cockroachdb_test_api(args: TestAPIArgs) -> TestApi {
+    let url = cockroachdb_url(args.test_function_name);
+    let features = preview_features(args.test_features);
+    let connector = postgres_migration_connector(&url, features).await;
+
+    TestApi {
+        database: connector.quaint().clone(),
+        api: MigrationApi::new(connector),
+        tags: args.test_tag,
+    }
+}
+
 pub async fn sqlite_test_api(args: TestAPIArgs) -> TestApi {
     let db_name = args.test_function_name;
     let features = preview_features(args.test_features);
