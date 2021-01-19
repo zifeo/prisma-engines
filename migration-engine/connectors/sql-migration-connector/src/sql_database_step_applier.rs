@@ -104,7 +104,13 @@ impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
     }
 
     async fn apply_script(&self, script: &str) -> ConnectorResult<()> {
-        Ok(self.conn().raw_cmd(script).await?)
+        self.conn().raw_cmd(script).await?;
+
+        if let Some(delay) = self.flavour.delay_after_migration() {
+            std::thread::sleep(delay)
+        }
+
+        Ok(())
     }
 }
 

@@ -7,6 +7,7 @@ mod mysql;
 mod postgres;
 mod sqlite;
 
+use chrono::Duration;
 use enumflags2::BitFlags;
 pub(crate) use mssql::MssqlFlavour;
 pub(crate) use mysql::MysqlFlavour;
@@ -109,4 +110,9 @@ pub(crate) trait SqlFlavour:
 
     /// Feature flags for the flavor
     fn features(&self) -> BitFlags<MigrationFeature>;
+
+    /// Artificial delay after a migration
+    fn delay_after_migration(&self) -> Option<std::time::Duration> {
+        None
+    }
 }

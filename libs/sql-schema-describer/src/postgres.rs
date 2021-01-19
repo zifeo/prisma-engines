@@ -201,8 +201,9 @@ impl SqlSchemaDescriber {
             let tpe = get_column_type(&col, enums);
             let default = Self::get_default_value(&col, &tpe, sequences);
 
-            let auto_increment =
-                is_identity || matches!(default.as_ref().map(|d| d.kind()), Some(DefaultKind::DBGENERATED(s)) if s == "unique_rowid()") || matches!(default.as_ref().map(|d| d.kind()), Some(DefaultKind::SEQUENCE(_)));
+            let auto_increment = is_identity
+                || matches!(default.as_ref().map(|d| d.kind()), Some(DefaultKind::DBGENERATED(s)) if s == "unique_rowid()")
+                || matches!(default.as_ref().map(|d| d.kind()), Some(DefaultKind::SEQUENCE(_)));
 
             let col = Column {
                 name,
@@ -474,8 +475,8 @@ impl SqlSchemaDescriber {
             let name = row.get_expect_string("name");
             let column_name = row.get_expect_string("column_name");
             let is_unique = row.get_expect_bool("is_unique");
-            let is_primary_key = row.get_expect_bool("is_primary_key");
-            let table_name = row.get_expect_string("table_name");
+            let is_primary_key = dbg!(row.get_expect_bool("is_primary_key"));
+            let table_name = dbg!(row.get_expect_string("table_name"));
             let sequence_name = row.get_string("sequence_name");
 
             if is_primary_key {

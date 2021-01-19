@@ -280,7 +280,7 @@ impl SqlFlavour for MysqlFlavour {
 
 #[derive(BitFlags, Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
-pub enum Circumstances {
+enum Circumstances {
     LowerCasesTableNames = 0b0001,
     IsMysql56 = 0b0010,
     IsMariadb = 0b0100,

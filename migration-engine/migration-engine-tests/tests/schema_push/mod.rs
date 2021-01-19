@@ -14,7 +14,7 @@ model Box {
 }
 "#;
 
-#[test_each_connector]
+#[test_each_connector(log = "debug")]
 async fn schema_push_happy_path(api: &TestApi) -> TestResult {
     api.schema_push(SCHEMA)
         .send()

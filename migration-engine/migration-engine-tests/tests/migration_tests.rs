@@ -12,6 +12,9 @@ mod native_types;
 mod reset;
 mod schema_push;
 
+use std::thread;
+
+use chrono::Duration;
 use migration_engine_tests::sql::*;
 use pretty_assertions::assert_eq;
 use prisma_value::PrismaValue;
@@ -2823,7 +2826,7 @@ async fn a_model_can_be_removed(api: &TestApi) -> TestResult {
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(log = "debug", features("native_types"))]
 async fn a_default_can_be_dropped(api: &TestApi) -> TestResult {
     let directory = api.create_migrations_directory()?;
 
@@ -2839,7 +2842,7 @@ async fn a_default_can_be_dropped(api: &TestApi) -> TestResult {
     let dm2 = r#"
         model User {
             id   Int     @id @default(autoincrement())
-            name String?
+            name String
         }
     "#;
 

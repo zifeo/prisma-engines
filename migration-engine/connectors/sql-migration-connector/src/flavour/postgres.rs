@@ -1,10 +1,16 @@
 use crate::{connect, connection_wrapper::Connection, error::quaint_error_to_connector_error, SqlFlavour};
+use chrono::Duration;
 use enumflags2::BitFlags;
 use indoc::indoc;
 use migration_connector::{ConnectorError, ConnectorResult, MigrationDirectory, MigrationFeature};
+use once_cell::sync::Lazy;
 use quaint::{connector::PostgresUrl, error::ErrorKind as QuaintKind, prelude::SqlFamily};
+use regex::Regex;
 use sql_schema_describer::{DescriberErrorKind, SqlSchema, SqlSchemaDescriberBackend};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicU8, Ordering},
+};
 use url::Url;
 use user_facing_errors::{
     common::DatabaseDoesNotExist, introspection_engine::DatabaseSchemaInconsistent, migration_engine, KnownError,
@@ -15,15 +21,34 @@ use user_facing_errors::{
 pub(crate) struct PostgresFlavour {
     pub(crate) url: PostgresUrl,
     features: BitFlags<MigrationFeature>,
+    circumstances: AtomicU8,
+}
+
+#[derive(BitFlags, Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+enum Circumstances {
+    IsCockroach = 0b0001,
 }
 
 impl PostgresFlavour {
     pub fn new(url: PostgresUrl, features: BitFlags<MigrationFeature>) -> Self {
-        Self { url, features }
+        Self {
+            url,
+            features,
+            circumstances: Default::default(),
+        }
+    }
+
+    pub(crate) fn is_cockroachdb(&self) -> bool {
+        self.circumstances().contains(Circumstances::IsCockroach)
     }
 
     pub(crate) fn schema_name(&self) -> &str {
         self.url.schema()
+    }
+
+    fn circumstances(&self) -> BitFlags<Circumstances> {
+        BitFlags::<Circumstances>::from_bits(self.circumstances.load(Ordering::Relaxed)).unwrap_or_default()
     }
 }
 
@@ -86,6 +111,14 @@ impl SqlFlavour for PostgresFlavour {
         Ok(connection.raw_cmd(sql).await?)
     }
 
+    fn delay_after_migration(&self) -> Option<std::time::Duration> {
+        if self.is_cockroachdb() {
+            Some(std::time::Duration::from_millis(200))
+        } else {
+            None
+        }
+    }
+
     async fn describe_schema<'a>(&'a self, connection: &Connection) -> ConnectorResult<SqlSchema> {
         sql_schema_describer::postgres::SqlSchemaDescriber::new(connection.quaint().clone())
             .describe(connection.connection_info().schema_name())
@@ -117,21 +150,37 @@ impl SqlFlavour for PostgresFlavour {
         Ok(())
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self, connection))]
     async fn ensure_connection_validity(&self, connection: &Connection) -> ConnectorResult<()> {
         let schema_name = connection.connection_info().schema_name();
         let schema_exists_result = connection
             .query_raw(
-                "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = $1)",
+                "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = $1), version()",
                 &[schema_name.into()],
             )
             .await?;
 
-        if let Some(true) = schema_exists_result
-            .get(0)
-            .and_then(|row| row.at(0).and_then(|value| value.as_bool()))
-        {
-            return Ok(());
+        let row = schema_exists_result.get(0);
+
+        if let Some(row) = row {
+            static COCKROACH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)cockroach").unwrap());
+
+            row.at(1).and_then(|version| version.to_string()).map(|version| {
+                if COCKROACH_RE.is_match(&version) {
+                    tracing::debug!("Determined that we are connected to a CockroachDB database");
+                    let mut circumstances = self.circumstances();
+                    circumstances |= Circumstances::IsCockroach;
+                    self.circumstances.store(circumstances.bits(), Ordering::Relaxed);
+                }
+            });
+
+            if self.is_cockroachdb() {
+                connection.raw_cmd("SET default_int_size = 4;").await?;
+            }
+
+            if let Some(true) = row.at(0).and_then(|value| value.as_bool()) {
+                return Ok(());
+            }
         }
 
         tracing::debug!(

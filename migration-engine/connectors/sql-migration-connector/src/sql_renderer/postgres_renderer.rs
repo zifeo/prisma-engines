@@ -1,10 +1,12 @@
 use super::{common::*, SqlRenderer};
 use crate::{
-    flavour::PostgresFlavour,
+    flavour::{PostgresFlavour, SqlFlavour},
     pair::Pair,
     sql_migration::{AddColumn, AlterColumn, AlterEnum, AlterTable, DropColumn, RedefineTable, TableChange},
     sql_schema_differ::{ColumnChange, ColumnChanges},
 };
+use migration_connector::MigrationFeature;
+use native_types::PostgresType;
 use once_cell::sync::Lazy;
 use prisma_value::PrismaValue;
 use regex::Regex;
@@ -230,17 +232,23 @@ impl SqlRenderer for PostgresFlavour {
 
     fn render_column(&self, column: &ColumnWalker<'_>) -> String {
         let column_name = self.quote(column.name());
-        let tpe_str = render_column_type(column.column_type());
+        let tpe_str = render_column_type(column.column_type(), self);
         let nullability_str = render_nullability(&column);
         let default_str = column
             .default()
             .filter(|default| !matches!(default.kind(), DefaultKind::DBGENERATED(_)))
             .map(|default| format!(" DEFAULT {}", self.render_default(default, column.column_type_family())))
             .unwrap_or_else(String::new);
-        let is_serial = column.is_autoincrement();
 
-        if is_serial {
-            format!("{} SERIAL", column_name)
+        if column.is_autoincrement() && !self.is_cockroachdb() {
+            let name = match column.column_native_type() {
+                Some(PostgresType::SmallInt) => "SMALLSERIAL",
+                Some(PostgresType::Integer) => "SERIAL",
+                Some(PostgresType::BigInt) => "BIGSERIAL",
+                None => "SERIAL",
+                _ => unreachable!("autoincrement on non-int column"),
+            };
+            format!("{} {}", column_name, name)
         } else {
             format!(
                 "{}{} {}{}{}",
@@ -279,7 +287,7 @@ impl SqlRenderer for PostgresFlavour {
             (DefaultKind::VALUE(val), ColumnTypeFamily::DateTime) => format!("'{}'", val).into(),
             (DefaultKind::VALUE(PrismaValue::String(val)), ColumnTypeFamily::Json) => format!("'{}'", val).into(),
             (DefaultKind::VALUE(val), _) => val.to_string().into(),
-            (DefaultKind::SEQUENCE(_), _) => "".into(),
+            (DefaultKind::SEQUENCE(_), _) => "unique_rowid()".into(), // cockroach-specific
         }
     }
 
@@ -362,7 +370,7 @@ impl SqlRenderer for PostgresFlavour {
     }
 }
 
-pub(crate) fn render_column_type(t: &ColumnType) -> String {
+pub(crate) fn render_column_type(t: &ColumnType, flavour: &PostgresFlavour) -> String {
     let array = match t.arity {
         ColumnArity::List => "[]",
         _ => "",
@@ -377,7 +385,13 @@ pub(crate) fn render_column_type(t: &ColumnType) -> String {
         ColumnTypeFamily::DateTime => format!("TIMESTAMP(3){}", array),
         ColumnTypeFamily::Float => format!("DECIMAL(65,30){}", array),
         ColumnTypeFamily::Decimal => format!("DECIMAL(65,30){}", array),
-        ColumnTypeFamily::Int => format!("INTEGER{}", array),
+        ColumnTypeFamily::Int => {
+            if flavour.is_cockroachdb() {
+                format!("INT4{}", array)
+            } else {
+                format!("INTEGER{}", array)
+            }
+        }
         ColumnTypeFamily::BigInt => format!("BIGINT{}", array),
         ColumnTypeFamily::String => format!("TEXT{}", array),
         ColumnTypeFamily::Enum(name) => format!("{}{}", Quoted::postgres_ident(name), array),
@@ -432,7 +446,7 @@ fn render_alter_column(
             PostgresAlterColumn::SetType(ty) => clauses.push(format!(
                 "{} SET DATA TYPE {}",
                 &alter_column_prefix,
-                render_column_type(&ty)
+                render_column_type(&ty, renderer)
             )),
             PostgresAlterColumn::AddSequence => {
                 // We imitate the sequence that would be automatically created on a `SERIAL` column.
