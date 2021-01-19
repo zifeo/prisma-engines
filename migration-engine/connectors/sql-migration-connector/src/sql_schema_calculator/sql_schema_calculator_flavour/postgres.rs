@@ -58,7 +58,7 @@ impl SqlSchemaCalculatorFlavour for PostgresFlavour {
 
         let (family, data_type) = match postgres_type {
             PostgresType::SmallInt => (ColumnTypeFamily::Int, "SMALLINT".to_owned()),
-            PostgresType::Integer => (ColumnTypeFamily::Int, "INTEGER".to_owned()),
+            PostgresType::Integer => (ColumnTypeFamily::Int, "INT4".to_owned()),
             PostgresType::BigInt => (ColumnTypeFamily::BigInt, "BIGINT".to_owned()),
             PostgresType::Decimal(precision) => (
                 ColumnTypeFamily::Decimal,

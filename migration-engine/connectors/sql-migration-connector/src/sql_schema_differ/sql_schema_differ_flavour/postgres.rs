@@ -63,6 +63,7 @@ impl SqlSchemaDifferFlavour for PostgresFlavour {
 
     fn column_type_change(&self, differ: &ColumnDiffer<'_>) -> Option<ColumnTypeChange> {
         use ColumnTypeChange::*;
+
         let native_types_enabled = self.features().contains(MigrationFeature::NativeTypes);
         let from_list_to_scalar = differ.previous.arity().is_list() && !differ.next.arity().is_list();
         let from_scalar_to_list = !differ.previous.arity().is_list() && differ.next.arity().is_list();
@@ -88,7 +89,7 @@ impl SqlSchemaDifferFlavour for PostgresFlavour {
             let previous_type: Option<PostgresType> = differ.previous.column_native_type();
             let next_type: Option<PostgresType> = differ.next.column_native_type();
 
-            match (previous_type, next_type) {
+            match dbg!((previous_type, next_type)) {
                 (_, Some(PostgresType::Text)) if from_list_to_scalar => Some(SafeCast),
                 (_, Some(PostgresType::VarChar(None))) if from_list_to_scalar => Some(SafeCast),
                 (_, Some(PostgresType::VarChar(_))) if from_list_to_scalar => Some(RiskyCast),

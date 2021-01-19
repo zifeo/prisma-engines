@@ -1,5 +1,4 @@
 use crate::{connect, connection_wrapper::Connection, error::quaint_error_to_connector_error, SqlFlavour};
-use chrono::Duration;
 use enumflags2::BitFlags;
 use indoc::indoc;
 use migration_connector::{ConnectorError, ConnectorResult, MigrationDirectory, MigrationFeature};

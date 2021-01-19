@@ -1,11 +1,10 @@
 use super::{common::*, SqlRenderer};
 use crate::{
-    flavour::{PostgresFlavour, SqlFlavour},
+    flavour::PostgresFlavour,
     pair::Pair,
     sql_migration::{AddColumn, AlterColumn, AlterEnum, AlterTable, DropColumn, RedefineTable, TableChange},
     sql_schema_differ::{ColumnChange, ColumnChanges},
 };
-use migration_connector::MigrationFeature;
 use native_types::PostgresType;
 use once_cell::sync::Lazy;
 use prisma_value::PrismaValue;
@@ -156,9 +155,12 @@ impl SqlRenderer for PostgresFlavour {
 
         let tables = schemas.tables(table_index);
 
+        let mut alter_table_line =
+            |s: String| lines.push(format!("ALTER TABLE \"{}\" {}", tables.previous().name(), s));
+
         for change in changes {
             match change {
-                TableChange::DropPrimaryKey => lines.push(format!(
+                TableChange::DropPrimaryKey => alter_table_line(format!(
                     "DROP CONSTRAINT {}",
                     Quoted::postgres_ident(
                         tables
@@ -168,7 +170,7 @@ impl SqlRenderer for PostgresFlavour {
                             .expect("Missing constraint name for DROP CONSTRAINT on Postgres.")
                     )
                 )),
-                TableChange::AddPrimaryKey { columns } => lines.push(format!(
+                TableChange::AddPrimaryKey { columns } => alter_table_line(format!(
                     "ADD PRIMARY KEY ({})",
                     columns.iter().map(|colname| self.quote(colname)).join(", ")
                 )),
@@ -176,11 +178,11 @@ impl SqlRenderer for PostgresFlavour {
                     let column = tables.next().column_at(*column_index);
                     let col_sql = self.render_column(&column);
 
-                    lines.push(format!("ADD COLUMN {}", col_sql));
+                    alter_table_line(format!("ADD COLUMN {}", col_sql));
                 }
                 TableChange::DropColumn(DropColumn { index }) => {
                     let name = self.quote(tables.previous().column_at(*index).name());
-                    lines.push(format!("DROP COLUMN {}", name));
+                    alter_table_line(format!("DROP COLUMN {}", name));
                 }
                 TableChange::AlterColumn(AlterColumn {
                     column_index,
@@ -189,14 +191,7 @@ impl SqlRenderer for PostgresFlavour {
                 }) => {
                     let columns = tables.columns(column_index);
 
-                    render_alter_column(
-                        self,
-                        &columns,
-                        changes,
-                        &mut before_statements,
-                        &mut lines,
-                        &mut after_statements,
-                    );
+                    render_alter_column(self, &columns, changes, &mut before_statements, &mut after_statements);
                 }
                 TableChange::DropAndRecreateColumn {
                     column_index,
@@ -205,10 +200,10 @@ impl SqlRenderer for PostgresFlavour {
                     let columns = tables.columns(column_index);
                     let name = self.quote(columns.previous().name());
 
-                    lines.push(format!("DROP COLUMN {}", name));
+                    alter_table_line(format!("DROP COLUMN {}", name));
 
                     let col_sql = self.render_column(columns.next());
-                    lines.push(format!("ADD COLUMN {}", col_sql));
+                    alter_table_line(format!("ADD COLUMN {}", col_sql));
                 }
             };
         }
@@ -217,15 +212,9 @@ impl SqlRenderer for PostgresFlavour {
             return Vec::new();
         }
 
-        let alter_table = format!(
-            "ALTER TABLE {} {}",
-            self.quote(tables.previous().name()),
-            lines.join(",\n")
-        );
-
         before_statements
             .into_iter()
-            .chain(std::iter::once(alter_table))
+            .chain(lines.into_iter())
             .chain(after_statements.into_iter())
             .collect()
     }
@@ -240,12 +229,12 @@ impl SqlRenderer for PostgresFlavour {
             .map(|default| format!(" DEFAULT {}", self.render_default(default, column.column_type_family())))
             .unwrap_or_else(String::new);
 
-        if column.is_autoincrement() && !self.is_cockroachdb() {
+        if column.is_autoincrement() {
             let name = match column.column_native_type() {
-                Some(PostgresType::SmallInt) => "SMALLSERIAL",
-                Some(PostgresType::Integer) => "SERIAL",
-                Some(PostgresType::BigInt) => "BIGSERIAL",
-                None => "SERIAL",
+                Some(PostgresType::SmallInt) => "SERIAL2",
+                Some(PostgresType::Integer) => "SERIAL4",
+                Some(PostgresType::BigInt) => "SERIAL8",
+                None => "SERIAL4",
                 _ => unreachable!("autoincrement on non-int column"),
             };
             format!("{} {}", column_name, name)
@@ -287,7 +276,7 @@ impl SqlRenderer for PostgresFlavour {
             (DefaultKind::VALUE(val), ColumnTypeFamily::DateTime) => format!("'{}'", val).into(),
             (DefaultKind::VALUE(PrismaValue::String(val)), ColumnTypeFamily::Json) => format!("'{}'", val).into(),
             (DefaultKind::VALUE(val), _) => val.to_string().into(),
-            (DefaultKind::SEQUENCE(_), _) => "unique_rowid()".into(), // cockroach-specific
+            (DefaultKind::SEQUENCE(_), _) => "".into(),
         }
     }
 
@@ -413,9 +402,9 @@ fn render_alter_column(
     columns: &Pair<ColumnWalker<'_>>,
     column_changes: &ColumnChanges,
     before_statements: &mut Vec<String>,
-    clauses: &mut Vec<String>,
     after_statements: &mut Vec<String>,
-) {
+) -> Vec<String> {
+    let mut clauses = Vec::new();
     let steps = expand_alter_column(columns, column_changes);
     let table_name = Quoted::postgres_ident(columns.previous().table().name());
     let column_name = Quoted::postgres_ident(columns.previous().name());
@@ -479,6 +468,8 @@ fn render_alter_column(
             }
         }
     }
+
+    clauses
 }
 
 fn expand_alter_column(columns: &Pair<ColumnWalker<'_>>, column_changes: &ColumnChanges) -> Vec<PostgresAlterColumn> {

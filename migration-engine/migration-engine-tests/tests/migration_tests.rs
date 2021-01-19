@@ -12,9 +12,6 @@ mod native_types;
 mod reset;
 mod schema_push;
 
-use std::thread;
-
-use chrono::Duration;
 use migration_engine_tests::sql::*;
 use pretty_assertions::assert_eq;
 use prisma_value::PrismaValue;
@@ -302,7 +299,7 @@ async fn making_an_existing_id_field_autoincrement_works(api: &TestApi) -> TestR
 }
 
 // Ignoring sqlite is OK, because sqlite integer primary keys are always auto-incrementing.
-#[test_each_connector(ignore("sqlite"))]
+#[test_each_connector(ignore("sqlite"), features("native_types"), log = "debug")]
 async fn removing_autoincrement_from_an_existing_field_works(api: &TestApi) -> TestResult {
     use quaint::ast::{Insert, Select};
 
@@ -733,7 +730,7 @@ async fn can_handle_reserved_sql_keywords_for_field_name(api: &TestApi) -> TestR
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(log = "debug", features("native_types"))]
 async fn update_type_of_scalar_field_must_work(api: &TestApi) -> TestResult {
     let dm1 = r#"
         model Test {

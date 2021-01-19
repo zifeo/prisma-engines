@@ -13,13 +13,21 @@ use sql_schema_describer::{walkers::SqlSchemaExt, SqlSchema};
 impl DatabaseMigrationStepApplier<SqlMigration> for SqlMigrationConnector {
     #[tracing::instrument(skip(self, database_migration))]
     async fn apply_step(&self, database_migration: &SqlMigration, index: usize) -> ConnectorResult<bool> {
-        self.apply_next_step(
-            &database_migration.steps,
-            index,
-            self.flavour(),
-            database_migration.schemas(),
-        )
-        .await
+        let maybe = self
+            .apply_next_step(
+                &database_migration.steps,
+                index,
+                self.flavour(),
+                database_migration.schemas(),
+            )
+            .await?;
+
+        if let Some(delay) = self.flavour.delay_after_migration() {
+            dbg!("sleeping {}", delay);
+            std::thread::sleep(delay)
+        }
+
+        Ok(maybe)
     }
 
     fn render_steps_pretty(

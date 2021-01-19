@@ -7,7 +7,6 @@ mod mysql;
 mod postgres;
 mod sqlite;
 
-use chrono::Duration;
 use enumflags2::BitFlags;
 pub(crate) use mssql::MssqlFlavour;
 pub(crate) use mysql::MysqlFlavour;
