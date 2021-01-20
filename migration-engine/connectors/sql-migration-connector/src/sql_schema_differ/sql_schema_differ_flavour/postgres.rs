@@ -89,7 +89,7 @@ impl SqlSchemaDifferFlavour for PostgresFlavour {
             let previous_type: Option<PostgresType> = differ.previous.column_native_type();
             let next_type: Option<PostgresType> = differ.next.column_native_type();
 
-            match dbg!((previous_type, next_type)) {
+            dbg!(match dbg!((previous_type, next_type)) {
                 (_, Some(PostgresType::Text)) if from_list_to_scalar => Some(SafeCast),
                 (_, Some(PostgresType::VarChar(None))) if from_list_to_scalar => Some(SafeCast),
                 (_, Some(PostgresType::VarChar(_))) if from_list_to_scalar => Some(RiskyCast),
@@ -98,7 +98,7 @@ impl SqlSchemaDifferFlavour for PostgresFlavour {
                 (Some(previous), Some(next)) => native_type_change_riskyness(previous, next),
                 // Unsupported types will have None as Native type
                 _ => Some(NotCastable),
-            }
+            })
         }
     }
 }

@@ -154,23 +154,15 @@ async fn decimal_to_float_is_noop(api: &TestApi) -> TestResult {
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(features("native_types"))]
 async fn bytes_to_string_works(api: &TestApi) -> TestResult {
-    let dm1 = format!(
+    let dm1 = api.native_types_datamodel(
         r#"
-        {datasource}
-
-        generator client {{
-            provider = "prisma-client-js"
-            previewFeatures = ["nativeTypes"]
-        }}
-
-        model Cat {{
+        model Cat {
             id String @id
             meowData Bytes
-        }}
-    "#,
-        datasource = api.datasource()
+        }
+        "#,
     );
 
     api.schema_push(&dm1).send().await?.assert_green()?;
