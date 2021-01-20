@@ -2,6 +2,7 @@
 /// empty nodes and edges, instead of destroying parts of the graph
 /// and losing information in the process.
 /// Considered an implementation detail of the QueryGraph.
+#[derive(Debug)]
 pub(super) struct Guard<T: Sized> {
     content: Option<T>,
 }

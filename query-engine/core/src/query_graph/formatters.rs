@@ -1,7 +1,10 @@
 use super::*;
+use petgraph::dot::Dot;
 use std::fmt::{self, Display};
 
 pub fn format(graph: &QueryGraph) -> String {
+    println!("{:?}", Dot::new(&graph.graph));
+
     format!(
         "---- Query Graph ----\nResult Nodes: {}\nMarked Nodes: {}\nRoot Nodes: {}\n\n{}\n----------------------",
         fmt_raw_indices(&graph.result_nodes),

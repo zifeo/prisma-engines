@@ -34,6 +34,12 @@ pub enum Node {
     Empty,
 }
 
+impl std::fmt::Debug for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Node")
+    }
+}
+
 impl From<Query> for Node {
     fn from(q: Query) -> Node {
         Node::Query(q)
@@ -55,12 +61,19 @@ pub enum Flow {
     Return(Option<Vec<RecordProjection>>),
 }
 
+impl std::fmt::Debug for Flow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Flow node")
+    }
+}
+
 impl Flow {
     pub fn default_if() -> Self {
         Self::If(Box::new(|| true))
     }
 }
 
+#[derive(Debug)]
 // Current limitation: We need to narrow it down to ID diffs for Hash and EQ.
 pub enum Computation {
     Diff(DiffNode),
@@ -75,6 +88,7 @@ impl Computation {
     }
 }
 
+#[derive(Debug)]
 pub struct DiffNode {
     pub left: HashSet<RecordProjection>,
     pub right: HashSet<RecordProjection>,
@@ -136,6 +150,18 @@ pub enum QueryGraphDependency {
 
     /// Only valid in the context of a `If` control flow node.
     Else,
+}
+
+impl std::fmt::Debug for QueryGraphDependency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QueryGraphDependency::ExecutionOrder => write!(f, "Before"),
+            QueryGraphDependency::ParentResult(_) => write!(f, "Needs data"),
+            QueryGraphDependency::ParentProjection(projection, _) => write!(f, "{:?}", projection),
+            QueryGraphDependency::Then => write!(f, "Then"),
+            QueryGraphDependency::Else => write!(f, "Else"),
+        }
+    }
 }
 
 /// A graph representing an abstract view of queries and their execution dependencies.
