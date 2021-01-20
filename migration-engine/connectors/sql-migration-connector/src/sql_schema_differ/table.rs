@@ -99,11 +99,11 @@ impl<'schema> TableDiffer<'schema> {
 
     /// The primary key present in `previous` but not `next`, if applicable.
     pub(crate) fn dropped_primary_key(&self) -> Option<&'schema PrimaryKey> {
-        match self.tables.as_ref().map(|t| t.primary_key()).as_tuple() {
+        match dbg!(self.tables.as_ref().map(|t| t.primary_key()).as_tuple()) {
             (Some(pk), None) => Some(pk),
             (Some(previous_pk), Some(next_pk)) if previous_pk.columns != next_pk.columns => Some(previous_pk),
             (Some(previous_pk), Some(_next_pk)) => {
-                if self.primary_key_column_changed(previous_pk) {
+                if dbg!(self.primary_key_column_changed(previous_pk)) {
                     Some(previous_pk)
                 } else {
                     None
@@ -115,14 +115,15 @@ impl<'schema> TableDiffer<'schema> {
 
     /// Returns true if any of the columns of the primary key changed type.
     fn primary_key_column_changed(&self, previous_pk: &PrimaryKey) -> bool {
-        self.column_pairs()
+        dbg!(self
+            .column_pairs()
             .filter(|columns| {
                 previous_pk
                     .columns
                     .iter()
                     .any(|pk_col| pk_col == columns.previous.name())
             })
-            .any(|columns| columns.all_changes().0.type_changed())
+            .any(|columns| columns.all_changes().0.type_changed()))
     }
 
     fn previous_columns<'a>(&'a self) -> impl Iterator<Item = ColumnWalker<'schema>> + 'a {

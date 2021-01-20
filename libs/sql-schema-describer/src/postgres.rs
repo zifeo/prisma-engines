@@ -190,6 +190,11 @@ impl SqlSchemaDescriber {
             let table_name = col.get_expect_string("table_name");
             let name = col.get_expect_string("column_name");
 
+            // TODO: this is an ugly cockroach hack
+            if name == "rowid" {
+                continue;
+            }
+
             let is_identity = match col.get("is_identity") {
                 Some(quaint::Value::Text(Some(s))) if s.as_ref().eq_ignore_ascii_case("yes") => true,
                 Some(quaint::Value::Text(Some(s))) if s.as_ref().eq_ignore_ascii_case("no") => false,

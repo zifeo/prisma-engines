@@ -195,7 +195,7 @@ async fn adding_an_id_field_of_type_int_must_work_for_sqlite(api: &TestApi) -> T
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(features("native_types"))]
 async fn adding_an_id_field_of_type_int_with_autoincrement_works(api: &TestApi) -> TestResult {
     let dm2 = r#"
         model Test {
@@ -1004,7 +1004,7 @@ async fn changing_a_scalar_field_to_a_relation_field_must_work(api: &TestApi) ->
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(features("native_types"), log = "debug")]
 async fn adding_a_many_to_many_relation_must_result_in_a_prisma_style_relation_table(api: &TestApi) -> TestResult {
     let dm1 = r##"
         model A {
@@ -2781,7 +2781,7 @@ async fn a_table_recreation_with_noncastable_columns_should_trigger_warnings(api
 //     Ok(())
 // }
 
-#[test_each_connector]
+#[test_each_connector(features("native_types"), log = "debug")]
 async fn a_model_can_be_removed(api: &TestApi) -> TestResult {
     let directory = api.create_migrations_directory()?;
 

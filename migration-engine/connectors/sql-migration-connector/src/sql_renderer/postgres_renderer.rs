@@ -5,7 +5,6 @@ use crate::{
     sql_migration::{AddColumn, AlterColumn, AlterEnum, AlterTable, DropColumn, RedefineTable, TableChange},
     sql_schema_differ::{ColumnChange, ColumnChanges},
 };
-use native_types::PostgresType;
 use once_cell::sync::Lazy;
 use prisma_value::PrismaValue;
 use regex::Regex;
@@ -370,7 +369,6 @@ pub(crate) fn render_column_type(col: &ColumnWalker<'_>, flavour: &PostgresFlavo
         ColumnTypeFamily::Decimal => format!("DECIMAL(65,30){}", array),
         ColumnTypeFamily::Int if is_autoincrement && flavour.is_cockroachdb() => format!("SERIAL4{}", array),
         ColumnTypeFamily::Int if is_autoincrement => format!("SERIAL{}", array),
-        ColumnTypeFamily::Int if flavour.is_cockroachdb() => format!("INTEGER{}", array),
         ColumnTypeFamily::Int if flavour.is_cockroachdb() => format!("INT4{}", array),
         ColumnTypeFamily::Int => format!("INTEGER{}", array),
         ColumnTypeFamily::BigInt if is_autoincrement => format!("BIGSERIAL{}", array),

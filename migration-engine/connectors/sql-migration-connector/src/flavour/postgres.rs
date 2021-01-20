@@ -112,7 +112,7 @@ impl SqlFlavour for PostgresFlavour {
 
     fn delay_after_migration(&self) -> Option<std::time::Duration> {
         if self.is_cockroachdb() {
-            Some(std::time::Duration::from_millis(200))
+            Some(std::time::Duration::from_millis(10))
         } else {
             None
         }

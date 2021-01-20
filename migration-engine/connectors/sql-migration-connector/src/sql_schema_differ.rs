@@ -283,7 +283,7 @@ impl<'schema> SqlSchemaDiffer<'schema> {
     }
 
     fn drop_primary_key(differ: &TableDiffer<'_>) -> Option<TableChange> {
-        let from_psl_change = differ.dropped_primary_key().map(|_pk| TableChange::DropPrimaryKey);
+        let from_psl_change = dbg!(differ.dropped_primary_key().map(|_pk| TableChange::DropPrimaryKey));
 
         if differ.flavour.should_recreate_the_primary_key_on_column_recreate() {
             from_psl_change.or_else(|| {
@@ -295,7 +295,7 @@ impl<'schema> SqlSchemaDiffer<'schema> {
                     _ => false,
                 });
 
-                if from_recreate {
+                if dbg!(from_recreate) {
                     Some(TableChange::DropPrimaryKey)
                 } else {
                     None
