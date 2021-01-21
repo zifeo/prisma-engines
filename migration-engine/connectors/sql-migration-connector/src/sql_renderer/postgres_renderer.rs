@@ -154,12 +154,12 @@ impl SqlRenderer for PostgresFlavour {
 
         let tables = schemas.tables(table_index);
 
-        let mut alter_table_line =
+        let mut push_alter_table_line =
             |s: String| lines.push(format!("ALTER TABLE \"{}\" {}", tables.previous().name(), s));
 
         for change in changes {
             match change {
-                TableChange::DropPrimaryKey => alter_table_line(format!(
+                TableChange::DropPrimaryKey => push_alter_table_line(format!(
                     "DROP CONSTRAINT {}",
                     Quoted::postgres_ident(
                         tables
@@ -169,7 +169,7 @@ impl SqlRenderer for PostgresFlavour {
                             .expect("Missing constraint name for DROP CONSTRAINT on Postgres.")
                     )
                 )),
-                TableChange::AddPrimaryKey { columns } => alter_table_line(format!(
+                TableChange::AddPrimaryKey { columns } => push_alter_table_line(format!(
                     "ADD PRIMARY KEY ({})",
                     columns.iter().map(|colname| self.quote(colname)).join(", ")
                 )),
@@ -177,11 +177,11 @@ impl SqlRenderer for PostgresFlavour {
                     let column = tables.next().column_at(*column_index);
                     let col_sql = self.render_column(&column);
 
-                    alter_table_line(format!("ADD COLUMN {}", col_sql));
+                    push_alter_table_line(format!("ADD COLUMN {}", col_sql));
                 }
                 TableChange::DropColumn(DropColumn { index }) => {
                     let name = self.quote(tables.previous().column_at(*index).name());
-                    alter_table_line(format!("DROP COLUMN {}", name));
+                    push_alter_table_line(format!("DROP COLUMN {}", name));
                 }
                 TableChange::AlterColumn(AlterColumn {
                     column_index,
@@ -190,7 +190,12 @@ impl SqlRenderer for PostgresFlavour {
                 }) => {
                     let columns = tables.columns(column_index);
 
-                    render_alter_column(self, &columns, changes, &mut before_statements, &mut after_statements);
+                    for line in
+                        render_alter_column(self, &columns, changes, &mut before_statements, &mut after_statements)
+                            .into_iter()
+                    {
+                        push_alter_table_line(line)
+                    }
                 }
                 TableChange::DropAndRecreateColumn {
                     column_index,
@@ -199,10 +204,10 @@ impl SqlRenderer for PostgresFlavour {
                     let columns = tables.columns(column_index);
                     let name = self.quote(columns.previous().name());
 
-                    alter_table_line(format!("DROP COLUMN {}", name));
+                    push_alter_table_line(format!("DROP COLUMN {}", name));
 
                     let col_sql = self.render_column(columns.next());
-                    alter_table_line(format!("ADD COLUMN {}", col_sql));
+                    push_alter_table_line(format!("ADD COLUMN {}", col_sql));
                 }
             };
         }

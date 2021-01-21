@@ -15,6 +15,7 @@ pub enum Tags {
     Mssql2019 = 0b10000000,
     Postgres12 = 0b100000000,
     Mssql = 0b1000000000,
+    Cockroach = 0b10000000000,
 }
 
 impl Tags {
@@ -47,6 +48,7 @@ impl StdError for UnknownTagError {}
 /// All the tags, sorted by name.
 static TAG_NAMES: Lazy<Vec<(&str, BitFlags<Tags>)>> = Lazy::new(|| {
     vec![
+        ("cockroach", Tags::Cockroach.into()),
         ("mariadb", Tags::Mariadb.into()),
         ("mssql", Tags::Mssql.into()),
         ("mssql_2017", Tags::Mssql2017.into()),

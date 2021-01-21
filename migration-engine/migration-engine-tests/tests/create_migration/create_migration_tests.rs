@@ -19,6 +19,19 @@ async fn basic_create_migration_works(api: &TestApi) -> TestResult {
         .assert_migration_directories_count(1)?
         .assert_migration("create-cats", |migration| {
             let expected_script = match api.sql_family() {
+                SqlFamily::Postgres if api.is_cockroachdb() => {
+                    indoc! {
+                        r#"
+                        -- CreateTable
+                        CREATE TABLE "Cat" (
+                            "id" INT4 NOT NULL,
+                            "name" TEXT NOT NULL,
+
+                            PRIMARY KEY ("id")
+                        );
+                        "#
+                    }
+                }
                 SqlFamily::Postgres => {
                     indoc! {
                         r#"
@@ -110,6 +123,19 @@ async fn creating_a_second_migration_should_have_the_previous_sql_schema_as_base
         .assert_migration_directories_count(2)?
         .assert_migration("create-dogs", |migration| {
             let expected_script = match api.sql_family() {
+                SqlFamily::Postgres if api.is_cockroachdb() => {
+                    indoc! {
+                        r#"
+                        -- CreateTable
+                        CREATE TABLE "Dog" (
+                            "id" INT4 NOT NULL,
+                            "name" TEXT NOT NULL,
+
+                            PRIMARY KEY ("id")
+                        );
+                        "#
+                    }
+                }
                 SqlFamily::Postgres => {
                     indoc! {
                         r#"
@@ -314,6 +340,22 @@ async fn create_enum_step_only_rendered_when_needed(api: &TestApi) -> TestResult
         .assert_migration_directories_count(1)?
         .assert_migration("create-cats", |migration| {
             let expected_script = match api.sql_family() {
+                SqlFamily::Postgres if api.is_cockroachdb() => {
+                    indoc! {
+                        r#"
+                        -- CreateEnum
+                        CREATE TYPE "Mood" AS ENUM ('HUNGRY', 'SLEEPY');
+
+                        -- CreateTable
+                        CREATE TABLE "Cat" (
+                            "id" INT4 NOT NULL,
+                            "mood" "Mood" NOT NULL,
+
+                            PRIMARY KEY ("id")
+                        );
+                        "#
+                    }
+                }
                 SqlFamily::Postgres => {
                     indoc! {
                         r#"
@@ -379,6 +421,22 @@ async fn create_enum_renders_correctly(api: &TestApi) -> TestResult {
         .assert_migration_directories_count(1)?
         .assert_migration("create-cats", |migration| {
             let expected_script = match api.sql_family() {
+                SqlFamily::Postgres if api.is_cockroachdb() => {
+                    indoc! {
+                        r#"
+                        -- CreateEnum
+                        CREATE TYPE "Mood" AS ENUM ('HUNGRY', 'SLEEPY');
+
+                        -- CreateTable
+                        CREATE TABLE "Cat" (
+                            "id" INT4 NOT NULL,
+                            "mood" "Mood" NOT NULL,
+
+                            PRIMARY KEY ("id")
+                        );
+                        "#
+                    }
+                }
                 SqlFamily::Postgres => {
                     indoc! {
                         r#"

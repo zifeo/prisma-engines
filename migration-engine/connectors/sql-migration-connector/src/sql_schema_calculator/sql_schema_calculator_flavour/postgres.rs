@@ -19,11 +19,11 @@ impl SqlSchemaCalculatorFlavour for PostgresFlavour {
     fn default_native_type_for_family(&self, family: ColumnTypeFamily) -> Option<serde_json::Value> {
         let ty = match family {
             ColumnTypeFamily::Int => {
-                if self.is_cockroachdb() {
-                    PostgresType::BigInt
-                } else {
-                    PostgresType::Integer
-                }
+                // if self.is_cockroachdb() {
+                //     PostgresType::BigInt
+                // } else {
+                PostgresType::Integer
+                // }
             }
             ColumnTypeFamily::BigInt => PostgresType::BigInt,
             ColumnTypeFamily::Float => PostgresType::Decimal(Some((65, 30))),

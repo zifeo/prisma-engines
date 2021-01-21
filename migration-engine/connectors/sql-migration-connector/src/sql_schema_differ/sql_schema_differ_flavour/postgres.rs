@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::SqlSchemaDifferFlavour;
 use crate::flavour::SqlFlavour;
 use crate::{
@@ -59,6 +61,27 @@ impl SqlSchemaDifferFlavour for PostgresFlavour {
         });
 
         POSTGRES_IGNORED_TABLES.is_match(table_name)
+    }
+
+    fn tables_to_redefine(&self, differ: &SqlSchemaDiffer<'_>) -> HashSet<String> {
+        if !self.is_cockroachdb() {
+            return HashSet::new();
+        }
+
+        dbg!(differ
+            .table_pairs()
+            .filter(|tables| {
+                tables
+                    .dropped_foreign_keys()
+                    .filter_map(|fk| {
+                        differ
+                            .table_pairs()
+                            .find(|tables| tables.previous().name() == fk.referenced_table().name())
+                    })
+                    .any(|tables| tables.created_primary_key().is_some() || tables.dropped_primary_key().is_some())
+            })
+            .map(|tables| tables.previous().name().to_owned())
+            .collect())
     }
 
     fn column_type_change(&self, differ: &ColumnDiffer<'_>) -> Option<ColumnTypeChange> {

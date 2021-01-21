@@ -57,6 +57,10 @@ impl TestApi {
         &self.database
     }
 
+    pub fn is_cockroachdb(&self) -> bool {
+        self.tags.contains(Tags::Cockroach)
+    }
+
     pub fn is_sqlite(&self) -> bool {
         self.tags.contains(Tags::Sqlite)
     }
