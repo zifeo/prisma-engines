@@ -34,9 +34,10 @@ impl super::SqlSchemaDescriberBackend for SqlSchemaDescriber {
 
     #[tracing::instrument]
     async fn describe(&self, schema: &str) -> DescriberResult<SqlSchema> {
+        dbg!("heh");
         let sequences = self.get_sequences(schema).await?;
         let enums = self.get_enums(schema).await?;
-        let mut columns = self.get_columns(schema, &enums, &sequences).await?;
+        let mut columns = dbg!(self.get_columns(schema, &enums, &sequences).await)?;
         let mut foreign_keys = self.get_foreign_keys(schema).await?;
         let mut indexes = self.get_indices(schema, &sequences).await?;
 
@@ -484,6 +485,10 @@ impl SqlSchemaDescriber {
             let table_name = row.get_expect_string("table_name");
             let sequence_name = row.get_string("sequence_name");
 
+            if column_name == "rowid" {
+                continue;
+            }
+
             if is_primary_key {
                 let entry: &mut (Vec<_>, Option<PrimaryKey>) =
                     indexes_map.entry(table_name).or_insert_with(|| (Vec::new(), None));
@@ -682,11 +687,13 @@ fn get_column_type(row: &ResultRow, enums: &[Enum]) -> ColumnType {
     let unsupported_type = || (Unsupported(full_data_type.clone()), None);
     let enum_exists = |name| enums.iter().any(|e| e.name == name);
 
-    let (family, native_type) = match full_data_type.as_str() {
+    let (family, native_type) = match dbg!(full_data_type.as_str()) {
         name if data_type == "USER-DEFINED" && enum_exists(name) => (Enum(name.to_owned()), None),
         name if data_type == "ARRAY" && name.starts_with('_') && enum_exists(name.trim_start_matches('_')) => {
             (Enum(name.trim_start_matches('_').to_owned()), None)
         }
+        // Cockroach workaround
+        name if enum_exists(name) => (Enum(name.to_owned()), None),
         "int2" | "_int2" => (Int, Some(PostgresType::SmallInt)),
         "int4" | "_int4" => (Int, Some(PostgresType::Integer)),
         "int8" | "_int8" => (BigInt, Some(PostgresType::BigInt)),
@@ -770,14 +777,15 @@ fn is_autoincrement(value: &str, sequences: &[Sequence]) -> Option<String> {
 
 fn unsuffix_default_literal<'a>(literal: &'a str, data_type: &str, full_data_type: &str) -> Option<Cow<'a, str>> {
     static POSTGRES_DATA_TYPE_SUFFIX_RE: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r#"(?ms)^(.*)::(\\")?(.*)(\\")?$"#).unwrap());
+        Lazy::new(|| Regex::new(r#"(?ms)^([^:]*):::?(\\")?(.*)(\\")?$"#).unwrap());
 
     let captures = POSTGRES_DATA_TYPE_SUFFIX_RE.captures(literal)?;
     let suffix = captures.get(3).unwrap().as_str();
 
-    if suffix != data_type && suffix != full_data_type {
-        return None;
-    }
+    // Cockroach workaround
+    // if suffix != data_type && suffix != full_data_type {
+    //     return None;
+    // }
 
     let first_capture = captures.get(1).unwrap().as_str();
 

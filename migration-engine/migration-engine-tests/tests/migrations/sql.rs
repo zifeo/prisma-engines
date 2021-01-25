@@ -155,7 +155,7 @@ struct Cat<'a> {
     previous_mood: Cow<'a, str>,
 }
 
-#[test_each_connector(capabilities("enums"), tags("sql"))]
+#[test_each_connector(capabilities("enums"), tags("sql"), log = "debug")]
 async fn enum_defaults_must_work(api: &TestApi) -> TestResult {
     let dm = r##"
         model Cat {
@@ -176,8 +176,12 @@ async fn enum_defaults_must_work(api: &TestApi) -> TestResult {
         .await?
         .assert_green()?;
 
+    dbg!("here");
+
     let insert = quaint::ast::Insert::single_into(api.render_table_name("Cat")).value("id", "the-id");
     api.database().execute(insert.into()).await?;
+
+    dbg!("here");
 
     let record = api
         .database()
@@ -190,7 +194,11 @@ async fn enum_defaults_must_work(api: &TestApi) -> TestResult {
         )
         .await?;
 
-    let cat: Cat = quaint::serde::from_row(record.into_single()?)?;
+    dbg!("here");
+
+    let cat: Cat = quaint::serde::from_row(dbg!(record.into_single())?)?;
+
+    dbg!("here");
 
     let expected_cat = Cat {
         id: "the-id".into(),

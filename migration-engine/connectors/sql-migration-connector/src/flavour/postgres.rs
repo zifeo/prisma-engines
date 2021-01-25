@@ -173,9 +173,9 @@ impl SqlFlavour for PostgresFlavour {
                 }
             });
 
-            if self.is_cockroachdb() {
-                connection.raw_cmd("SET default_int_size = 4;").await?;
-            }
+            // if self.is_cockroachdb() {
+            //     connection.raw_cmd("SET standard_conforming_strings = 'off';").await?;
+            // }
 
             if let Some(true) = row.at(0).and_then(|value| value.as_bool()) {
                 return Ok(());

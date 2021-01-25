@@ -118,7 +118,7 @@ async fn adding_a_scalar_field_must_work_with_native_types_off(api: &TestApi) ->
     Ok(())
 }
 
-#[test_each_connector(features("native_types"), capabilities("enums"))]
+#[test_each_connector(features("native_types"), capabilities("enums"), log = "debug")]
 async fn adding_an_enum_field_must_work(api: &TestApi) -> TestResult {
     let dm = r#"
         model Test {
@@ -310,7 +310,7 @@ async fn adding_an_id_field_of_type_int_with_autoincrement_works(api: &TestApi) 
     let column = result.table_bang("Test").column_bang("myId");
 
     match api.sql_family() {
-        SqlFamily::Postgres => {
+        SqlFamily::Postgres if !api.is_cockroachdb() => {
             let sequence = result.get_sequence("Test_myId_seq").expect("sequence must exist");
             let default = column.default.as_ref().expect("Must have nextval default");
             assert_eq!(DefaultValue::sequence(sequence.name.clone()), *default);
@@ -905,7 +905,7 @@ async fn changing_the_type_of_an_id_field_must_work(api: &TestApi) -> TestResult
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(features("native_types"), log = "debug")]
 async fn changing_the_type_of_a_field_referenced_by_a_fk_must_work(api: &TestApi) -> TestResult {
     let dm1 = r#"
         model A {
@@ -1668,7 +1668,7 @@ async fn reserved_sql_key_words_must_work(api: &TestApi) -> TestResult {
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(features("native_types"))]
 async fn migrations_with_many_to_many_related_models_must_not_recreate_indexes(api: &TestApi) -> TestResult {
     // test case for https://github.com/prisma/lift/issues/148
     let dm_1 = r#"
@@ -1856,7 +1856,7 @@ async fn column_defaults_must_be_migrated(api: &TestApi) -> TestResult {
     Ok(())
 }
 
-#[test_each_connector]
+#[test_each_connector(features("native_types"), log = "debug")]
 async fn escaped_string_defaults_are_not_arbitrarily_migrated(api: &TestApi) -> TestResult {
     use quaint::ast::Insert;
 
@@ -2555,7 +2555,7 @@ async fn switching_databases_must_work(api: &TestApi) -> TestResult {
 }
 
 // TODO: Enable SQL Server when cascading rules are in PSL.
-#[test_each_connector(ignore("mssql_2019", "mssql_2017"))]
+#[test_each_connector(ignore("mssql_2019", "mssql_2017"), features("native_types"))]
 async fn adding_mutual_references_on_existing_tables_works(api: &TestApi) -> TestResult {
     let dm1 = r#"
         model A {
@@ -2922,7 +2922,7 @@ async fn a_model_can_be_removed(api: &TestApi) -> TestResult {
     Ok(())
 }
 
-#[test_each_connector(features("native_types"))]
+#[test_each_connector(features("native_types"), log = "debug")]
 async fn a_default_can_be_dropped(api: &TestApi) -> TestResult {
     let directory = api.create_migrations_directory()?;
 

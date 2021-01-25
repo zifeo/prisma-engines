@@ -80,8 +80,8 @@ impl<'a> ColumnDiffer<'a> {
         }
 
         let defaults = (
-            &self.previous.default().as_ref().map(|d| d.kind()),
-            &self.next.default().as_ref().map(|d| d.kind()),
+            dbg!(&self.previous.default().as_ref()).map(|d| d.kind()),
+            dbg!(&self.next.default().as_ref()).map(|d| d.kind()),
         );
 
         match defaults {

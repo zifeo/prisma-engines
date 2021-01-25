@@ -218,7 +218,7 @@ async fn creating_a_scalar_list_field_for_an_existing_table_must_work(api: &Test
     Ok(())
 }
 
-#[test_each_connector(tags("sql"))]
+#[test_each_connector(tags("sql"), features("native_types"))]
 async fn delete_a_field_for_a_non_existent_column_must_work(api: &TestApi) -> TestResult {
     let dm1 = r#"
             model Blog {

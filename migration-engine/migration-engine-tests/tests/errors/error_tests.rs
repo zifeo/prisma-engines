@@ -323,7 +323,7 @@ async fn datamodel_parser_errors_must_return_a_known_error(api: &TestApi) {
     assert_eq!(error, expected_error);
 }
 
-#[test_each_connector]
+#[test_each_connector(features("native_types"))]
 async fn unique_constraint_errors_in_migrations_must_return_a_known_error(api: &TestApi) -> TestResult {
     use quaint::ast::*;
 
