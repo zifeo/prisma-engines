@@ -14,6 +14,13 @@ pub enum DefaultValue {
 }
 
 impl DefaultValue {
+    pub fn as_single(&self) -> Option<&PrismaValue> {
+        match self {
+            DefaultValue::Single(v) => Some(v),
+            _ => None,
+        }
+    }
+
     /// Returns either a copy of the contained single value or produces a new
     /// value as defined by the expression.
     pub fn get(&self) -> Option<PrismaValue> {
@@ -26,6 +33,16 @@ impl DefaultValue {
     /// Does this match @default(autoincrement())?
     pub fn is_autoincrement(&self) -> bool {
         matches!(self, DefaultValue::Expression(generator) if generator.name == "autoincrement")
+    }
+
+    /// Does this match @default(dbgenerated())?
+    pub fn is_dbgenerated(&self) -> bool {
+        matches!(self, DefaultValue::Expression(generator) if generator.name == "dbgenerated")
+    }
+
+    /// Does this match @default(now())?
+    pub fn is_now(&self) -> bool {
+        matches!(self, DefaultValue::Expression(generator) if generator.name == "now")
     }
 
     pub fn new_db_generated() -> Self {
@@ -172,5 +189,22 @@ mod tests {
         let auto_increment_default = DefaultValue::Expression(ValueGenerator::new_autoincrement());
 
         assert!(auto_increment_default.is_autoincrement());
+    }
+
+    #[test]
+    fn default_value_is_now() {
+        let auto_increment_default = DefaultValue::Expression(ValueGenerator::new_now());
+
+        assert!(auto_increment_default.is_now());
+        assert!(!auto_increment_default.is_autoincrement());
+    }
+
+    #[test]
+    fn default_value_is_dbgenerated() {
+        let auto_increment_default = DefaultValue::Expression(ValueGenerator::new_dbgenerated());
+
+        assert!(auto_increment_default.is_dbgenerated());
+        assert!(!auto_increment_default.is_now());
+        assert!(!auto_increment_default.is_autoincrement());
     }
 }

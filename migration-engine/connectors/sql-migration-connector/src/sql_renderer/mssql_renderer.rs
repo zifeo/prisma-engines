@@ -8,6 +8,7 @@ use crate::{
     sql_migration::{AlterEnum, AlterTable, RedefineTable},
 };
 use indoc::formatdoc;
+use native_types::{MsSqlType, MsSqlTypeParameter};
 use prisma_value::PrismaValue;
 use sql_schema_describer::{
     walkers::{ColumnWalker, EnumWalker, ForeignKeyWalker, IndexWalker, TableWalker},
@@ -61,25 +62,25 @@ impl SqlRenderer for MssqlFlavour {
         let r#type = render_column_type(column);
         let nullability = common::render_nullability(&column);
 
-        let default = column
-            .default()
-            .filter(|default| !matches!(default.kind(), DefaultKind::DBGENERATED(_)))
-            .map(|default| {
-                let constraint_name = format!("DF__{}__{}", column.table().name(), column.name());
-
-                format!(
-                    " CONSTRAINT {} DEFAULT {}",
-                    self.quote(&constraint_name),
-                    self.render_default(default, &column.column_type_family())
-                )
-            })
-            .unwrap_or_else(String::new);
-
-        if column.is_autoincrement() {
-            format!("{} INT IDENTITY(1,1)", column_name)
+        let default = if column.is_autoincrement() {
+            Cow::Borrowed(" IDENTITY(1,1)")
         } else {
-            format!("{} {}{}{}", column_name, r#type, nullability, default)
-        }
+            column
+                .default()
+                .filter(|default| !matches!(default.kind(), DefaultKind::DBGENERATED(_)))
+                .map(|default| {
+                    let constraint_name = format!("DF__{}__{}", column.table().name(), column.name());
+
+                    Cow::Owned(format!(
+                        " CONSTRAINT {} DEFAULT {}",
+                        self.quote(&constraint_name),
+                        self.render_default(default, &column.column_type_family())
+                    ))
+                })
+                .unwrap_or_default()
+        };
+
+        format!("{} {}{}{}", column_name, r#type, nullability, default)
     }
 
     fn render_references(&self, foreign_key: &ForeignKeyWalker<'_>) -> String {
@@ -408,25 +409,55 @@ impl SqlRenderer for MssqlFlavour {
 }
 
 fn render_column_type(column: &ColumnWalker<'_>) -> Cow<'static, str> {
-    if !column.column_type().full_data_type.is_empty() {
-        return column.column_type().full_data_type.clone().into();
+    fn format_u32_arg(arg: Option<u32>) -> String {
+        match arg {
+            None => "".to_string(),
+            Some(x) => format!("({})", x),
+        }
+    }
+    fn format_type_param(arg: Option<MsSqlTypeParameter>) -> String {
+        match arg {
+            None => "".to_string(),
+            Some(MsSqlTypeParameter::Number(x)) => format!("({})", x),
+            Some(MsSqlTypeParameter::Max) => "(max)".to_string(),
+        }
     }
 
-    let r#type = match &column.column_type().family {
-        ColumnTypeFamily::Boolean => "BIT",
-        ColumnTypeFamily::DateTime => "DATETIME2",
-        ColumnTypeFamily::Float => "DECIMAL(32,16)",
-        ColumnTypeFamily::Decimal => "DECIMAL(32,16)",
-        ColumnTypeFamily::Int => "INT",
-        ColumnTypeFamily::BigInt => "BIGINT",
-        ColumnTypeFamily::String | ColumnTypeFamily::Json => "NVARCHAR(1000)",
-        ColumnTypeFamily::Binary => "VARBINARY(max)",
-        ColumnTypeFamily::Enum(_) => unimplemented!("Enums not supported in SQL Server."),
-        ColumnTypeFamily::Uuid => "UNIQUEIDENTIFIER",
-        ColumnTypeFamily::Unsupported(x) => unimplemented!("{} not handled yet", x),
-    };
+    let native_type = column
+        .column_native_type()
+        .expect("Missing column native type in mssql_renderer::render_column_type()");
 
-    r#type.into()
+    match native_type {
+        MsSqlType::TinyInt => "TINYINT".into(),
+        MsSqlType::SmallInt => "SMALLINT".into(),
+        MsSqlType::Int => "INT".into(),
+        MsSqlType::BigInt => "BIGINT".into(),
+        MsSqlType::Decimal(Some((p, s))) => format!("DECIMAL({p},{s})", p = p, s = s).into(),
+        MsSqlType::Decimal(None) => "DECIMAL".into(),
+        MsSqlType::Money => "MONEY".into(),
+        MsSqlType::SmallMoney => "SMALLMONEY".into(),
+        MsSqlType::Bit => "BIT".into(),
+        MsSqlType::Float(bits) => format!("FLOAT{bits}", bits = format_u32_arg(bits)).into(),
+
+        MsSqlType::Real => "REAL".into(),
+        MsSqlType::Date => "DATE".into(),
+        MsSqlType::Time => "TIME".into(),
+        MsSqlType::DateTime => "DATETIME".into(),
+        MsSqlType::DateTime2 => "DATETIME2".into(),
+        MsSqlType::DateTimeOffset => "DATETIMEOFFSET".into(),
+        MsSqlType::SmallDateTime => "SMALLDATETIME".into(),
+        MsSqlType::NChar(len) => format!("NCHAR{len}", len = format_u32_arg(len)).into(),
+        MsSqlType::Char(len) => format!("CHAR{len}", len = format_u32_arg(len)).into(),
+        MsSqlType::VarChar(len) => format!("VARCHAR{len}", len = format_type_param(len)).into(),
+        MsSqlType::Text => "TEXT".into(),
+        MsSqlType::NVarChar(len) => format!("NVARCHAR{len}", len = format_type_param(len)).into(),
+        MsSqlType::NText => "NTEXT".into(),
+        MsSqlType::Binary(len) => format!("BINARY{len}", len = format_u32_arg(len)).into(),
+        MsSqlType::VarBinary(len) => format!("VARBINARY{len}", len = format_type_param(len)).into(),
+        MsSqlType::Image => "IMAGE".into(),
+        MsSqlType::Xml => "XML".into(),
+        MsSqlType::UniqueIdentifier => "UNIQUEIDENTIFIER".into(),
+    }
 }
 
 fn escape_string_literal(s: &str) -> String {
