@@ -50,7 +50,7 @@ async fn basic_create_migration_works(api: &TestApi) -> TestResult {
                         r#"
                         -- CreateTable
                         CREATE TABLE `Cat` (
-                            `id` INT NOT NULL,
+                            `id` INTEGER NOT NULL,
                             `name` VARCHAR(191) NOT NULL,
 
                             PRIMARY KEY (`id`)
@@ -154,7 +154,7 @@ async fn creating_a_second_migration_should_have_the_previous_sql_schema_as_base
                         r#"
                         -- CreateTable
                         CREATE TABLE `Dog` (
-                            `id` INT NOT NULL,
+                            `id` INTEGER NOT NULL,
                             `name` VARCHAR(191) NOT NULL,
 
                             PRIMARY KEY (`id`)
@@ -377,7 +377,7 @@ async fn create_enum_step_only_rendered_when_needed(api: &TestApi) -> TestResult
                         r#"
                         -- CreateTable
                         CREATE TABLE `Cat` (
-                            `id` INT NOT NULL,
+                            `id` INTEGER NOT NULL,
                             `mood` ENUM('HUNGRY', 'SLEEPY') NOT NULL,
 
                             PRIMARY KEY (`id`)

@@ -382,9 +382,7 @@ pub(crate) fn render_column_type(col: &ColumnWalker<'_>, flavour: &PostgresFlavo
     let tpe: Cow<'_, str> = match native_type {
         PostgresType::SmallInt if is_autoincrement => "SMALLSERIAL".into(),
         PostgresType::SmallInt => "SMALLINT".into(),
-        PostgresType::Integer if is_autoincrement && flavour.is_cockroachdb() => "SERIAL4".into(),
         PostgresType::Integer if is_autoincrement => "SERIAL".into(),
-        PostgresType::Integer if flavour.is_cockroachdb() => "INT4".into(),
         PostgresType::Integer => "INTEGER".into(),
         PostgresType::BigInt if is_autoincrement => "BIGSERIAL".into(),
         PostgresType::BigInt => "BIGINT".into(),
