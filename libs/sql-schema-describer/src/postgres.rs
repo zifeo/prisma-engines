@@ -37,7 +37,7 @@ impl super::SqlSchemaDescriberBackend for SqlSchemaDescriber {
         dbg!("heh");
         let sequences = self.get_sequences(schema).await?;
         let enums = self.get_enums(schema).await?;
-        let mut columns = dbg!(self.get_columns(schema, &enums, &sequences).await)?;
+        let mut columns = self.get_columns(schema, &enums, &sequences).await?;
         let mut foreign_keys = self.get_foreign_keys(schema).await?;
         let mut indexes = self.get_indices(schema, &sequences).await?;
 
