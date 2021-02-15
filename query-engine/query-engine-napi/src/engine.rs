@@ -10,6 +10,7 @@ use request_handlers::{
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
+use tracing::{span, Level};
 
 /// The main engine, that can be cloned between threads when using JavaScript
 /// promises.
@@ -83,6 +84,9 @@ impl QueryEngine {
     pub fn new(opts: ConstructorOptions) -> crate::Result<Self> {
         crate::logger::init();
 
+        let span = span!(target: "query-engine-napi", Level::ERROR, "napi::new");
+        let _enter = span.enter();
+
         let ConstructorOptions {
             datamodel,
             datasource_overrides,
@@ -122,6 +126,9 @@ impl QueryEngine {
 
     /// Connect to the database, allow queries to be run.
     pub async fn connect(&self) -> crate::Result<()> {
+        let span = span!(target: "query-engine-napi", Level::ERROR, "napi::connect");
+        let _enter = span.enter();
+
         let mut inner = self.inner.write().await;
 
         match *inner {
@@ -169,6 +176,9 @@ impl QueryEngine {
 
     /// Disconnect and drop the core. Can be reconnected later with `#connect`.
     pub async fn disconnect(&self) -> crate::Result<()> {
+        let span = span!(target: "query-engine-napi", Level::ERROR, "napi::disconnect");
+        let _enter = span.enter();
+
         let mut inner = self.inner.write().await;
 
         match *inner {
@@ -194,6 +204,8 @@ impl QueryEngine {
 
     /// If connected, sends a query to the core and returns the response.
     pub async fn query(&self, query: GraphQlBody) -> crate::Result<PrismaResponse> {
+        let span = span!(target: "query-engine-napi", Level::ERROR, "napi::query");
+        let _enter = span.enter();
         match *self.inner.read().await {
             Inner::Connected(ref engine) => {
                 let handler = GraphQlHandler::new(engine.executor(), engine.query_schema());
@@ -206,6 +218,8 @@ impl QueryEngine {
 
     /// Loads the query schema. Only available when connected.
     pub async fn sdl_schema(&self) -> crate::Result<String> {
+        let span = span!(target: "query-engine-napi", Level::ERROR, "napi::sdlSchema");
+        let _enter = span.enter();
         match *self.inner.read().await {
             Inner::Connected(ref engine) => Ok(GraphQLSchemaRenderer::render(engine.query_schema().clone())),
             Inner::Builder(_) => Err(ApiError::NotConnected),
@@ -214,6 +228,8 @@ impl QueryEngine {
 
     /// Loads the DMMF. Only available when connected.
     pub async fn dmmf(&self) -> crate::Result<DataModelMetaFormat> {
+        let span = span!(target: "query-engine-napi", Level::ERROR, "napi::dmmf");
+        let _enter = span.enter();
         match *self.inner.read().await {
             Inner::Connected(ref engine) => {
                 let dmmf = dmmf::render_dmmf(&engine.datamodel.ast, engine.query_schema().clone());
@@ -226,6 +242,8 @@ impl QueryEngine {
 
     /// Loads the configuration.
     pub async fn get_config(&self) -> crate::Result<serde_json::Value> {
+        let span = span!(target: "query-engine-napi", Level::ERROR, "napi::getConfig");
+        let _enter = span.enter();
         match *self.inner.read().await {
             Inner::Connected(ref engine) => Ok(engine.config.clone()),
             Inner::Builder(ref builder) => {
@@ -237,6 +255,8 @@ impl QueryEngine {
 
     /// Info about the runnings server.
     pub async fn server_info(&self) -> crate::Result<ServerInfo> {
+        let span = span!(target: "query-engine-napi", Level::ERROR, "napi::serverInfo");
+        let _enter = span.enter();
         match *self.inner.read().await {
             Inner::Connected(ref engine) => Ok(ServerInfo {
                 commit: env!("GIT_HASH").into(),
