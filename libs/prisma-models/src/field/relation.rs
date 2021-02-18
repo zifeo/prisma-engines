@@ -128,32 +128,37 @@ impl RelationField {
     pub fn linking_fields(&self) -> ModelProjection {
         if self.relation().is_many_to_many() {
             self.model().primary_identifier()
-        } else if self.relation_info.references.is_empty() {
-            let related_field = self.related_field();
-            let model = self.model();
-            let fields = model.fields();
-
-            let referenced_fields: Vec<_> = related_field
-                .relation_info
-                .references
-                .iter()
-                .map(|field_name| {
-                    fields
-                        .find_from_all(field_name)
-                        .unwrap_or_else(|_| {
-                            panic!(
-                                "Invalid data model: To field {} can't be resolved on model {}",
-                                field_name, model.name
-                            )
-                        })
-                        .clone()
-                })
-                .collect();
-
-            ModelProjection::new(referenced_fields)
+        } else if self.is_inlined_on_enclosing_model() {
+            ModelProjection::new_from_scalar(self.scalar_fields())
         } else {
-            ModelProjection::new(vec![Arc::new(self.clone()).into()])
+            ModelProjection::new_from_scalar(self.related_field().referenced_fields())
         }
+        // else if self.relation_info.references.is_empty() {
+        //     let related_field = self.related_field();
+        //     let model = self.model();
+        //     let fields = model.fields();
+
+        //     let referenced_fields: Vec<_> = related_field
+        //         .relation_info
+        //         .references
+        //         .iter()
+        //         .map(|field_name| {
+        //             fields
+        //                 .find_from_all(field_name)
+        //                 .unwrap_or_else(|_| {
+        //                     panic!(
+        //                         "Invalid data model: To field {} can't be resolved on model {}",
+        //                         field_name, model.name
+        //                     )
+        //                 })
+        //                 .clone()
+        //         })
+        //         .collect();
+
+        //     ModelProjection::new(referenced_fields)
+        // } else {
+        //     ModelProjection::new(vec![Arc::new(self.clone()).into()])
+        // }
     }
 
     pub fn is_optional(&self) -> bool {
