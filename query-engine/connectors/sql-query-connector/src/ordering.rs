@@ -7,11 +7,16 @@ use quaint::ast::*;
 pub fn build(
     query_arguments: &QueryArguments,
     base_model: &ModelRef, // The model the ordering will start from
-) -> (Vec<OrderDefinition<'static>>, Vec<JoinData<'static>>) {
+) -> (
+    Vec<OrderDefinition<'static>>,
+    Vec<JoinData<'static>>,
+    Vec<Expression<'static>>,
+) {
     let needs_reversed_order = query_arguments.needs_reversed_order();
 
-    let mut order_definitions = vec![];
+    let mut order_definitions: Vec<(Expression, Option<Order>)> = vec![];
     let mut joins = vec![];
+    let mut group_bys = vec![];
 
     // The index is used to differentiate potentially separate relations to the same model.
     for (index, order_by) in query_arguments.order_by.iter().enumerate() {
@@ -74,13 +79,35 @@ pub fn build(
             );
         }
 
-        match (order_by.sort_order, needs_reversed_order) {
-            (SortOrder::Ascending, true) => order_definitions.push(order_by_column.descend()),
-            (SortOrder::Descending, true) => order_definitions.push(order_by_column.ascend()),
-            (SortOrder::Ascending, false) => order_definitions.push(order_by_column.ascend()),
-            (SortOrder::Descending, false) => order_definitions.push(order_by_column.descend()),
+        // Distinct, order by, group by
+
+        // TODO: Remove all these .to_owned() ... :facepalm:
+        match (order_by.sort_order, needs_reversed_order, order_by.sort_aggregation) {
+            (SortOrder::Ascending, true, None) => order_definitions.push(order_by_column.to_owned().descend()),
+            (SortOrder::Descending, true, None) => order_definitions.push(order_by_column.to_owned().ascend()),
+            (SortOrder::Ascending, false, None) => order_definitions.push(order_by_column.to_owned().ascend()),
+            (SortOrder::Descending, false, None) => order_definitions.push(order_by_column.to_owned().descend()),
+            (SortOrder::Ascending, true, Some(SortAggregation::Count)) => {
+                order_definitions.push((count(order_by_column.to_owned()).into(), Some(Order::Desc)))
+            }
+            (SortOrder::Descending, true, Some(SortAggregation::Count)) => {
+                order_definitions.push((count(order_by_column.to_owned()).into(), Some(Order::Asc)))
+            }
+            (SortOrder::Ascending, false, Some(SortAggregation::Count)) => {
+                order_definitions.push((count(order_by_column.to_owned()).into(), Some(Order::Asc)))
+            }
+            (SortOrder::Descending, false, Some(SortAggregation::Count)) => {
+                order_definitions.push((count(order_by_column.to_owned()).into(), Some(Order::Desc)))
+            }
         }
     }
 
-    (order_definitions, joins)
+    // TODO: Find out what fields must be grouped by exactly
+    if query_arguments.order_by.iter().any(|o| o.sort_aggregation.is_some()) {
+        let group_by_stmt = base_model.fields().id().unwrap().first().unwrap().as_column().group();
+
+        group_bys.push(group_by_stmt);
+    }
+
+    (order_definitions, joins, group_bys)
 }
