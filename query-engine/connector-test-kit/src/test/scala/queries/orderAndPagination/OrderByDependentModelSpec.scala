@@ -7,14 +7,14 @@ class OrderByDependentModelSpec extends FlatSpec with Matchers with ApiSpecBase 
   implicit val project: Project = SchemaDsl.fromStringV11() {
     """
       |model ModelA {
-      |  id   Int     @id
+      |  id   Int     @id @map("_id")
       |  b_id Int?
       |  b    ModelB? @relation(fields: [b_id], references: [id])
       |  c    ModelC?
       |}
       |
       |model ModelB {
-      |  id Int     @id
+      |  id Int     @id @map("_id")
       |  a  ModelA?
       |
       |  c_id Int?
@@ -22,7 +22,7 @@ class OrderByDependentModelSpec extends FlatSpec with Matchers with ApiSpecBase 
       |}
       |
       |model ModelC {
-      |  id   Int     @id
+      |  id   Int     @id @map("_id")
       |  b    ModelB?
       |  a_id Int?
       |  a    ModelA? @relation(fields: [a_id], references: [id])
@@ -307,7 +307,7 @@ class OrderByDependentModelSpec extends FlatSpec with Matchers with ApiSpecBase 
     val project = SchemaDsl.fromStringV11() {
       """
         |model ModelA {
-        |  id    Int     @id
+        |  id    Int     @id @map("_id")
         |
         |  b1_id Int?
         |  b1    ModelB? @relation(fields: [b1_id], references: [id], name: "1")
@@ -317,7 +317,7 @@ class OrderByDependentModelSpec extends FlatSpec with Matchers with ApiSpecBase 
         |}
         |
         |model ModelB {
-        |  id Int     @id
+        |  id Int     @id @map("_id")
         |
         |  a1 ModelA[] @relation("1")
         |  a2 ModelA[] @relation("2")
@@ -352,13 +352,13 @@ class OrderByDependentModelSpec extends FlatSpec with Matchers with ApiSpecBase 
     implicit val project: Project = SchemaDsl.fromStringV11() {
       """
        |model ModelA {
-       |  id   Int     @id
+       |  id   Int     @id @map("_id")
        |  b_id Int?
        |  b    ModelB? @relation(fields: [b_id], references: [id])
        |}
        |
        |model ModelB {
-       |  id Int     @id
+       |  id Int     @id @map("_id")
        |  a  ModelA?
        |
        |  c_id Int?
@@ -366,7 +366,7 @@ class OrderByDependentModelSpec extends FlatSpec with Matchers with ApiSpecBase 
        |}
        |
        |model ModelC {
-       |  id   Int     @id
+       |  id   Int     @id @map("_id")
        |  b    ModelB?
        |}
       """
@@ -398,13 +398,13 @@ class OrderByDependentModelSpec extends FlatSpec with Matchers with ApiSpecBase 
     implicit val project: Project = SchemaDsl.fromStringV11() {
       """
         |model ModelA {
-        |  id   Int     @id
+        |  id   Int     @id @map("_id")
         |  b_id Int?
         |  b    ModelB? @relation(fields: [b_id], references: [id])
         |}
         |
         |model ModelB {
-        |  id Int     @id
+        |  id Int     @id @map("_id")
         |  a  ModelA?
         |
         |  c_id Int?
@@ -412,7 +412,7 @@ class OrderByDependentModelSpec extends FlatSpec with Matchers with ApiSpecBase 
         |}
         |
         |model ModelC {
-        |  id   Int     @id
+        |  id   Int     @id @map("_id")
         |  b    ModelB?
         |}
       """
