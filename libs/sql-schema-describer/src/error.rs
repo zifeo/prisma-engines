@@ -6,6 +6,8 @@ use std::{
 };
 use tracing_error::SpanTrace;
 
+use crate::io_shell;
+
 /// The result type.
 pub type DescriberResult<T> = Result<T, DescriberError>;
 
@@ -45,6 +47,8 @@ impl From<DescriberErrorKind> for DescriberError {
 /// Variants of DescriberError.
 #[derive(Debug)]
 pub enum DescriberErrorKind {
+    /// IoShellError
+    IoShellError(io_shell::DatabaseError),
     /// An error originating from Quaint or the database.
     QuaintError(quaint::error::Error),
     /// An illegal cross-schema reference.
@@ -73,6 +77,7 @@ impl Display for DescriberError {
 impl Display for DescriberErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::IoShellError(err) => todo!(),
             Self::QuaintError(err) => err.fmt(f),
             Self::CrossSchemaReference { from, to, constraint } => {
                 write!(
@@ -90,6 +95,7 @@ impl Error for DescriberError {
         match &self.kind {
             DescriberErrorKind::QuaintError(err) => Some(err),
             DescriberErrorKind::CrossSchemaReference { .. } => None,
+            DescriberErrorKind::IoShellError(_) => todo!(),
         }
     }
 }
@@ -98,6 +104,15 @@ impl From<quaint::error::Error> for DescriberError {
     fn from(err: quaint::error::Error) -> Self {
         DescriberError {
             kind: DescriberErrorKind::QuaintError(err),
+            context: SpanTrace::capture(),
+        }
+    }
+}
+
+impl From<io_shell::DatabaseError> for DescriberError {
+    fn from(err: io_shell::DatabaseError) -> Self {
+        DescriberError {
+            kind: DescriberErrorKind::IoShellError(err),
             context: SpanTrace::capture(),
         }
     }

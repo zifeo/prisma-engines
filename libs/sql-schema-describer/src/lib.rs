@@ -18,13 +18,16 @@ pub mod postgres;
 pub mod sqlite;
 pub mod walkers;
 
+use serde::{Deserialize, Serialize};
 pub(crate) mod common;
+
 mod error;
+mod io_shell;
 mod parsers;
 
 /// A database description connector.
 #[async_trait::async_trait]
-pub trait SqlSchemaDescriberBackend: Send + Sync + 'static {
+pub trait SqlSchemaDescriberBackend: Send + Sync {
     /// List the database's schemas.
     async fn list_databases(&self) -> DescriberResult<Vec<String>>;
 

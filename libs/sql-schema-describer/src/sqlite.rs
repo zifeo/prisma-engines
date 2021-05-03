@@ -1,16 +1,24 @@
 //! SQLite description.
 use crate::{
-    common::purge_dangling_foreign_keys, getters::Getter, parsers::Parser, Column, ColumnArity, ColumnType,
-    ColumnTypeFamily, DefaultValue, DescriberResult, ForeignKey, ForeignKeyAction, Index, IndexType, Lazy, PrimaryKey,
-    PrismaValue, Regex, SqlMetadata, SqlSchema, SqlSchemaDescriberBackend, Table, View,
+    common::purge_dangling_foreign_keys,
+    io_shell::{self, iter_rows},
+    parsers::Parser,
+    Column, ColumnArity, ColumnType, ColumnTypeFamily, DefaultValue, DescriberResult, ForeignKey, ForeignKeyAction,
+    Index, IndexType, Lazy, PrimaryKey, PrismaValue, Regex, SqlMetadata, SqlSchema, SqlSchemaDescriberBackend, Table,
+    View,
 };
-use quaint::{ast::Value, prelude::Queryable, single::Quaint};
-use std::{borrow::Cow, collections::HashMap, convert::TryInto};
+use quaint::single::Quaint;
+use std::{borrow::Cow, collections::HashMap, convert::TryInto, fmt::Debug};
 use tracing::trace;
 
-#[derive(Debug)]
 pub struct SqlSchemaDescriber {
-    conn: Quaint,
+    conn: Box<(dyn io_shell::IoShell + Send + Sync)>,
+}
+
+impl Debug for SqlSchemaDescriber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SqlSchemaDescriber { .. }")
+    }
 }
 
 #[async_trait::async_trait]
@@ -76,7 +84,8 @@ impl SqlSchemaDescriberBackend for SqlSchemaDescriber {
 
     #[tracing::instrument]
     async fn version(&self, _schema: &str) -> DescriberResult<Option<String>> {
-        Ok(self.conn.version().await?)
+        todo!()
+        // Ok(self.conn.version().await?)
     }
 }
 
@@ -85,18 +94,16 @@ impl Parser for SqlSchemaDescriber {}
 impl SqlSchemaDescriber {
     /// Constructor.
     pub fn new(conn: Quaint) -> SqlSchemaDescriber {
-        SqlSchemaDescriber { conn }
+        SqlSchemaDescriber { conn: Box::new(conn) }
     }
 
     #[tracing::instrument]
     async fn get_databases(&self) -> DescriberResult<Vec<String>> {
         let sql = "PRAGMA database_list;";
-        let rows = self.conn.query_raw(sql, &[]).await?;
-        let names = rows
-            .into_iter()
+        let rows = self.conn.query(sql, &[]).await?;
+        let names = iter_rows(rows.as_ref())
             .map(|row| {
-                row.get("file")
-                    .and_then(|x| x.to_string())
+                row.str_at(0)
                     .and_then(|x| x.split('/').last().map(|x| x.to_string()))
                     .expect("convert schema names")
             })
@@ -111,12 +118,12 @@ impl SqlSchemaDescriber {
         let sql = r#"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name ASC"#;
         trace!("describing table names with query: '{}'", sql);
 
-        let result_set = self.conn.query_raw(&sql, &[]).await?;
+        let result_set = self.conn.query(&sql, &[]).await?;
 
-        let names = result_set
-            .into_iter()
-            .map(|row| row.get("name").and_then(|x| x.to_string()).unwrap())
-            .filter(|n| n != "sqlite_sequence")
+        let names = iter_rows(result_set.as_ref())
+            .filter_map(|row| row.str_at(0))
+            .filter(|n| *n != "sqlite_sequence")
+            .map(String::from)
             .collect();
 
         trace!("Found table names: {:?}", names);
@@ -127,11 +134,8 @@ impl SqlSchemaDescriber {
     #[tracing::instrument]
     async fn get_size(&self) -> DescriberResult<usize> {
         let sql = r#"SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size();"#;
-        let result = self.conn.query_raw(&sql, &[]).await?;
-        let size: i64 = result
-            .first()
-            .map(|row| row.get("size").and_then(|x| x.as_i64()).unwrap_or(0))
-            .unwrap();
+        let result = self.conn.query(&sql, &[]).await?;
+        let size: i64 = result.row_at(0).and_then(|row| row.i64_at(0)).unwrap();
 
         Ok(size.try_into().unwrap())
     }
@@ -154,13 +158,13 @@ impl SqlSchemaDescriber {
     #[tracing::instrument]
     async fn get_views(&self) -> DescriberResult<Vec<View>> {
         let sql = "SELECT name AS view_name, sql AS view_sql FROM sqlite_master WHERE type = 'view'";
-        let result_set = self.conn.query_raw(sql, &[]).await?;
+        let result_set = self.conn.query(sql, &[]).await?;
         let mut views = Vec::with_capacity(result_set.len());
 
-        for row in result_set.into_iter() {
+        for row in iter_rows(result_set.as_ref()) {
             views.push(View {
-                name: row.get_expect_string("view_name"),
-                definition: row.get_string("view_sql"),
+                name: row.str_at(0).unwrap().to_owned(),
+                definition: row.str_at(1).map(String::from),
             })
         }
 
@@ -170,25 +174,25 @@ impl SqlSchemaDescriber {
     #[tracing::instrument]
     async fn get_columns(&self, table: &str) -> DescriberResult<(Vec<Column>, Option<PrimaryKey>)> {
         let sql = format!(r#"PRAGMA table_info ("{}")"#, table);
-        let result_set = self.conn.query_raw(&sql, &[]).await?;
+        let result_set = self.conn.query(&sql, &[]).await?;
         let mut pk_cols: HashMap<i64, String> = HashMap::new();
-        let mut cols: Vec<Column> = result_set
-            .into_iter()
+        let mut cols: Vec<Column> = iter_rows(result_set.as_ref())
             .map(|row| {
-                trace!("Got column row {:?}", row);
-                let is_required = row.get("notnull").and_then(|x| x.as_bool()).expect("notnull");
+                // sqlite> PRAGMA table_info("a");
+                // cid|name|type|notnull|dflt_value|pk
+
+                let is_required = row.bool_at(3).expect("notnull");
 
                 let arity = if is_required {
                     ColumnArity::Required
                 } else {
                     ColumnArity::Nullable
                 };
-                let tpe = get_column_type(&row.get("type").and_then(|x| x.to_string()).expect("type"), arity);
+                let tpe = get_column_type(row.str_at(2).expect("type"), arity);
 
-                let default = match row.get("dflt_value") {
+                let default = match row.str_at(4) {
                     None => None,
-                    Some(val) if val.is_null() => None,
-                    Some(Value::Text(Some(cow_string))) => {
+                    Some(cow_string) => {
                         let default_string = cow_string.to_string();
 
                         if default_string.to_lowercase() == "null" {
@@ -239,9 +243,9 @@ impl SqlSchemaDescriber {
                     Some(_) => None,
                 };
 
-                let pk_col = row.get("pk").and_then(|x| x.as_i64()).expect("primary key");
+                let pk_col = row.i64_at(5).expect("primary key");
                 let col = Column {
-                    name: row.get("name").and_then(|x| x.to_string()).expect("name"),
+                    name: row.str_at(1).expect("name").to_owned(),
                     tpe,
                     default,
                     auto_increment: false,
@@ -307,18 +311,20 @@ impl SqlSchemaDescriber {
             pub on_update_action: ForeignKeyAction,
         }
 
+        // sqlite> PRAGMA foreign_key_list("b");
+        // id|seq|table|from|to|on_update|on_delete|match
+        // 0|0|a|other|id|NO ACTION|NO ACTION|NONE
         let sql = format!(r#"PRAGMA foreign_key_list("{}");"#, table);
         trace!("describing table foreign keys, SQL: '{}'", sql);
-        let result_set = self.conn.query_raw(&sql, &[]).await.expect("querying for foreign keys");
+        let result_set = self.conn.query(&sql, &[]).await?;
 
         // Since one foreign key with multiple columns will be represented here as several
         // rows with the same ID, we have to use an intermediate representation that gets
         // translated into the real foreign keys in another pass
         let mut intermediate_fks: HashMap<i64, IntermediateForeignKey> = HashMap::new();
-        for row in result_set.into_iter() {
-            trace!("got FK description row {:?}", row);
-            let id = row.get("id").and_then(|x| x.as_i64()).expect("id");
-            let seq = row.get("seq").and_then(|x| x.as_i64()).expect("seq");
+        for row in iter_rows(result_set.as_ref()) {
+            let id = row.i64_at(0).expect("id");
+            let seq = row.i64_at(1).expect("seq");
             let column = row.get("from").and_then(|x| x.to_string()).expect("from");
             // this can be null if the primary key and shortened fk syntax was used
             let referenced_column = row.get("to").and_then(|x| x.to_string());
@@ -420,14 +426,13 @@ impl SqlSchemaDescriber {
         Ok(fks)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_indices(&self, table: &str) -> DescriberResult<Vec<Index>> {
         let sql = format!(r#"PRAGMA index_list("{}");"#, table);
-        let result_set = self.conn.query_raw(&sql, &[]).await?;
-        trace!("Got indices description results: {:?}", result_set);
+        let result_set = self.conn.query(&sql, &[]).await?;
 
         let mut indices = Vec::new();
-        let filtered_rows = result_set
-            .into_iter()
+        let filtered_rows = iter_rows(result_set.as_ref())
             // Exclude primary keys, they are inferred separately.
             .filter(|row| row.get("origin").and_then(|origin| origin.as_str()).unwrap() != "pk")
             // Exclude partial indices
@@ -446,9 +451,8 @@ impl SqlSchemaDescriber {
             };
 
             let sql = format!(r#"PRAGMA index_info("{}");"#, name);
-            let result_set = self.conn.query_raw(&sql, &[]).await.expect("querying for index info");
-            trace!("Got index description results: {:?}", result_set);
-            for row in result_set.into_iter() {
+            let result_set = self.conn.query(&sql, &[]).await?;
+            for row in iter_rows(result_set.as_ref()) {
                 //if the index is on a rowid or expression, the name of the column will be null, we ignore these for now
                 match row.get("name").and_then(|x| x.to_string()) {
                     Some(name) => {
