@@ -212,6 +212,7 @@ impl From<sql_schema_describer::DescriberError> for SqlError {
             sql_schema_describer::DescriberErrorKind::CrossSchemaReference { .. } => {
                 SqlError::CrossSchemaReference(format!("{}", error))
             }
+            sql_schema_describer::DescriberErrorKind::IoShellError(_) => todo!(),
         }
     }
 }

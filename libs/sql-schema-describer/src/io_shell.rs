@@ -30,14 +30,9 @@ impl<'a> Row<'a> for quaint::connector::ResultRowRef<'a> {
     }
 }
 
-struct ResultSetIterator<'a> {
-    rowidx: usize,
-    result_set: &'a dyn ResultSet,
-}
-
 pub trait ResultSet {
     fn len(&self) -> usize;
-    fn row_at(&'_ self, rowidx: usize) -> Option<Box<dyn Row<'_> + '_>>;
+    fn row_at(&'_ self, rowidx: usize) -> Option<Box<dyn Row<'_> + Send + '_>>;
 }
 
 impl ResultSet for quaint::connector::ResultSet {
@@ -45,19 +40,21 @@ impl ResultSet for quaint::connector::ResultSet {
         quaint::connector::ResultSet::len(self)
     }
 
-    fn row_at(&self, rowidx: usize) -> Option<Box<dyn Row + '_>> {
-        self.get(rowidx).map(|row| -> Box<dyn Row> { Box::new(row) })
+    fn row_at(&self, rowidx: usize) -> Option<Box<dyn Row + Send + '_>> {
+        self.get(rowidx).map(|row| -> Box<dyn Row + Send> { Box::new(row) })
     }
 }
 
-pub fn iter_rows<'a>(rs: &'a (dyn ResultSet + 'a)) -> impl Iterator<Item = Box<dyn Row<'a> + 'a>> + 'a {
+pub fn iter_rows<'a>(
+    rs: &'a (dyn ResultSet + Send + Sync + 'a),
+) -> impl Iterator<Item = Box<dyn Row<'a> + Send + 'a>> + 'a {
     struct I<'a> {
         idx: usize,
-        inner: &'a (dyn ResultSet + 'a),
+        inner: &'a (dyn ResultSet + Send + Sync + 'a),
     }
 
     impl<'a> std::iter::Iterator for I<'a> {
-        type Item = Box<dyn Row<'a> + 'a>;
+        type Item = Box<dyn Row<'a> + Send + 'a>;
 
         fn next(&mut self) -> Option<Self::Item> {
             let row = self.inner.row_at(self.idx)?;
@@ -74,17 +71,25 @@ pub fn iter_rows<'a>(rs: &'a (dyn ResultSet + 'a)) -> impl Iterator<Item = Box<d
 }
 
 pub trait IoShell {
-    fn query<'a>(&'a self, query: &'a str, params: &'a [&'a str]) -> BoxFuture<'a, DbResult<Box<dyn ResultSet>>>;
+    fn query<'a>(
+        &'a self,
+        query: &'a str,
+        params: &'a [&'a str],
+    ) -> BoxFuture<'a, DbResult<Box<dyn ResultSet + Send + Sync>>>;
     fn raw_cmd<'a>(&'a self, query: &'a str) -> BoxFuture<'a, DbResult<()>>;
 }
 
 impl IoShell for Quaint {
-    fn query<'a>(&'a self, query: &'a str, params: &'a [&'a str]) -> BoxFuture<'a, DbResult<Box<dyn ResultSet>>> {
+    fn query<'a>(
+        &'a self,
+        query: &'a str,
+        params: &'a [&'a str],
+    ) -> BoxFuture<'a, DbResult<Box<dyn ResultSet + Send + Sync>>> {
         let params: Vec<_> = params.iter().map(|s| Value::text(*s)).collect();
         Box::pin(async move {
             <Quaint as Queryable>::query_raw(self, query, &params)
                 .await
-                .map(|res| -> Box<dyn ResultSet> { Box::new(res) })
+                .map(|res| -> Box<dyn ResultSet + Send + Sync> { Box::new(dbg!(res)) })
                 .map_err(|qerr| DatabaseError {
                     message: qerr.to_string(),
                     error_code: qerr.original_code().map(String::from).map(Cow::from),

@@ -63,6 +63,7 @@ impl SqlFlavour for SqliteFlavour {
             .describe(connection.connection_info().schema_name())
             .await
             .map_err(|err| match err.into_kind() {
+                DescriberErrorKind::IoShellError(_) => todo!(),
                 DescriberErrorKind::QuaintError(err) => {
                     quaint_error_to_connector_error(err, connection.connection_info())
                 }

@@ -77,7 +77,7 @@ impl Display for DescriberError {
 impl Display for DescriberErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::IoShellError(err) => todo!(),
+            Self::IoShellError(_) => todo!(),
             Self::QuaintError(err) => err.fmt(f),
             Self::CrossSchemaReference { from, to, constraint } => {
                 write!(

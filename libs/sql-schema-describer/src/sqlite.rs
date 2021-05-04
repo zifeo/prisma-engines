@@ -240,7 +240,6 @@ impl SqlSchemaDescriber {
                             })
                         }
                     }
-                    Some(_) => None,
                 };
 
                 let pk_col = row.i64_at(5).expect("primary key");
@@ -325,32 +324,26 @@ impl SqlSchemaDescriber {
         for row in iter_rows(result_set.as_ref()) {
             let id = row.i64_at(0).expect("id");
             let seq = row.i64_at(1).expect("seq");
-            let column = row.get("from").and_then(|x| x.to_string()).expect("from");
+            let column = row.str_at(3).expect("from");
             // this can be null if the primary key and shortened fk syntax was used
-            let referenced_column = row.get("to").and_then(|x| x.to_string());
-            let referenced_table = row.get("table").and_then(|x| x.to_string()).expect("table");
+            let referenced_column = row.str_at(4);
+            let referenced_table = row.str_at(2).expect("table").to_owned();
             match intermediate_fks.get_mut(&id) {
                 Some(fk) => {
-                    fk.columns.insert(seq, column);
+                    fk.columns.insert(seq, column.to_owned());
                     if let Some(column) = referenced_column {
-                        fk.referenced_columns.insert(seq, column);
+                        fk.referenced_columns.insert(seq, column.to_owned());
                     };
                 }
                 None => {
                     let mut columns: HashMap<i64, String> = HashMap::new();
-                    columns.insert(seq, column);
+                    columns.insert(seq, column.to_owned());
                     let mut referenced_columns: HashMap<i64, String> = HashMap::new();
 
                     if let Some(column) = referenced_column {
-                        referenced_columns.insert(seq, column);
+                        referenced_columns.insert(seq, column.to_owned());
                     };
-                    let on_delete_action = match row
-                        .get("on_delete")
-                        .and_then(|x| x.to_string())
-                        .expect("on_delete")
-                        .to_lowercase()
-                        .as_str()
-                    {
+                    let on_delete_action = match row.str_at(6).expect("on_delete").to_lowercase().as_str() {
                         "no action" => ForeignKeyAction::NoAction,
                         "restrict" => ForeignKeyAction::Restrict,
                         "set null" => ForeignKeyAction::SetNull,
@@ -358,13 +351,7 @@ impl SqlSchemaDescriber {
                         "cascade" => ForeignKeyAction::Cascade,
                         s => panic!("Unrecognized on delete action '{}'", s),
                     };
-                    let on_update_action = match row
-                        .get("on_update")
-                        .and_then(|x| x.to_string())
-                        .expect("on_update")
-                        .to_lowercase()
-                        .as_str()
-                    {
+                    let on_update_action = match row.str_at(5).expect("on_update").to_lowercase().as_str() {
                         "no action" => ForeignKeyAction::NoAction,
                         "restrict" => ForeignKeyAction::Restrict,
                         "set null" => ForeignKeyAction::SetNull,
@@ -428,21 +415,24 @@ impl SqlSchemaDescriber {
 
     #[tracing::instrument(skip(self))]
     async fn get_indices(&self, table: &str) -> DescriberResult<Vec<Index>> {
+        // sqlite> PRAGMA index_list("a");
+        // seq|name|unique|origin|partial
+        // 0|heh|0|c|0
         let sql = format!(r#"PRAGMA index_list("{}");"#, table);
         let result_set = self.conn.query(&sql, &[]).await?;
 
         let mut indices = Vec::new();
         let filtered_rows = iter_rows(result_set.as_ref())
             // Exclude primary keys, they are inferred separately.
-            .filter(|row| row.get("origin").and_then(|origin| origin.as_str()).unwrap() != "pk")
+            .filter(|row| row.str_at(3).unwrap() != "pk")
             // Exclude partial indices
-            .filter(|row| !row.get("partial").and_then(|partial| partial.as_bool()).unwrap());
+            .filter(|row| !row.bool_at(4).unwrap());
 
         'index_loop: for row in filtered_rows {
-            let is_unique = row.get("unique").and_then(|x| x.as_bool()).expect("get unique");
-            let name = row.get("name").and_then(|x| x.to_string()).expect("get name");
+            let is_unique = row.bool_at(2).expect("get unique");
+            let name = row.str_at(1).expect("get name");
             let mut index = Index {
-                name: name.clone(),
+                name: name.to_owned(),
                 tpe: match is_unique {
                     true => IndexType::Unique,
                     false => IndexType::Normal,
@@ -452,15 +442,16 @@ impl SqlSchemaDescriber {
 
             let sql = format!(r#"PRAGMA index_info("{}");"#, name);
             let result_set = self.conn.query(&sql, &[]).await?;
+
             for row in iter_rows(result_set.as_ref()) {
                 //if the index is on a rowid or expression, the name of the column will be null, we ignore these for now
-                match row.get("name").and_then(|x| x.to_string()) {
+                match row.str_at(2) {
                     Some(name) => {
-                        let pos = row.get("seqno").and_then(|x| x.as_i64()).expect("get seqno") as usize;
+                        let pos = row.i64_at(0).expect("get seqno") as usize;
                         if index.columns.len() <= pos {
                             index.columns.resize(pos + 1, "".to_string());
                         }
-                        index.columns[pos] = name;
+                        index.columns[pos] = name.to_owned();
                     }
                     None => break 'index_loop,
                 }
