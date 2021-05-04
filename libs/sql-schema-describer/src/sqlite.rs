@@ -12,7 +12,7 @@ use std::{borrow::Cow, collections::HashMap, convert::TryInto, fmt::Debug};
 use tracing::trace;
 
 pub struct SqlSchemaDescriber {
-    conn: Box<(dyn io_shell::IoShell + Send + Sync)>,
+    conn: Box<(dyn io_shell::IoShell)>,
 }
 
 impl Debug for SqlSchemaDescriber {
@@ -21,7 +21,8 @@ impl Debug for SqlSchemaDescriber {
     }
 }
 
-#[async_trait::async_trait]
+#[cfg_attr(feature = "unsend", async_trait::async_trait(?Send))]
+#[cfg_attr(not(feature = "unsend"), async_trait::async_trait)]
 impl SqlSchemaDescriberBackend for SqlSchemaDescriber {
     async fn list_databases(&self) -> DescriberResult<Vec<String>> {
         Ok(self.get_databases().await?)
@@ -98,7 +99,7 @@ impl SqlSchemaDescriber {
     }
 
     /// Constructor.
-    pub fn new_shell(conn: Box<dyn IoShell + Send + Sync + 'static>) -> SqlSchemaDescriber {
+    pub fn new_shell(conn: Box<dyn IoShell + 'static>) -> SqlSchemaDescriber {
         SqlSchemaDescriber { conn }
     }
 

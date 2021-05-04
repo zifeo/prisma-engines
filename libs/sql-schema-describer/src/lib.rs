@@ -26,8 +26,9 @@ pub mod io_shell;
 mod parsers;
 
 /// A database description connector.
-#[async_trait::async_trait]
-pub trait SqlSchemaDescriberBackend: Send + Sync {
+#[cfg_attr(feature = "unsend", async_trait::async_trait(?Send))]
+#[cfg_attr(not(feature = "unsend"), async_trait::async_trait)]
+pub trait SqlSchemaDescriberBackend {
     /// List the database's schemas.
     async fn list_databases(&self) -> DescriberResult<Vec<String>>;
 

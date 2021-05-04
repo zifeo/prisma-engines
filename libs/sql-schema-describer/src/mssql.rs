@@ -65,7 +65,8 @@ pub struct SqlSchemaDescriber {
     conn: Quaint,
 }
 
-#[async_trait::async_trait]
+#[cfg_attr(feature = "unsend", async_trait::async_trait(?Send))]
+#[cfg_attr(not(feature = "unsend"), async_trait::async_trait)]
 impl super::SqlSchemaDescriberBackend for SqlSchemaDescriber {
     async fn list_databases(&self) -> DescriberResult<Vec<String>> {
         Ok(self.get_databases().await?)

@@ -4,6 +4,9 @@ edition = "2018"
 name = "sql-schema-describer"
 version = "0.1.0"
 
+[features]
+unsend = []
+
 [dependencies]
 native-types = {path = "../native-types"}
 prisma-value = {path = "../prisma-value"}
