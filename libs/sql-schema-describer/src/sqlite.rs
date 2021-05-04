@@ -1,7 +1,7 @@
 //! SQLite description.
 use crate::{
     common::purge_dangling_foreign_keys,
-    io_shell::{self, iter_rows},
+    io_shell::{self, iter_rows, IoShell},
     parsers::Parser,
     Column, ColumnArity, ColumnType, ColumnTypeFamily, DefaultValue, DescriberResult, ForeignKey, ForeignKeyAction,
     Index, IndexType, Lazy, PrimaryKey, PrismaValue, Regex, SqlMetadata, SqlSchema, SqlSchemaDescriberBackend, Table,
@@ -95,6 +95,11 @@ impl SqlSchemaDescriber {
     /// Constructor.
     pub fn new(conn: Quaint) -> SqlSchemaDescriber {
         SqlSchemaDescriber { conn: Box::new(conn) }
+    }
+
+    /// Constructor.
+    pub fn new_shell(conn: Box<dyn IoShell + Send + Sync + 'static>) -> SqlSchemaDescriber {
+        SqlSchemaDescriber { conn }
     }
 
     #[tracing::instrument]

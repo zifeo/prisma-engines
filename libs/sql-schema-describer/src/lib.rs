@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) mod common;
 
 mod error;
-mod io_shell;
+pub mod io_shell;
 mod parsers;
 
 /// A database description connector.
