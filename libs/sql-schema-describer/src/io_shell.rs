@@ -13,7 +13,7 @@ pub type DbResult<T> = Result<T, DatabaseError>;
 pub trait Row<'a> {
     fn bool_at(&self, idx: usize) -> Option<bool>;
     fn i64_at(&self, idx: usize) -> Option<i64>;
-    fn str_at(&self, idx: usize) -> Option<&'a str>;
+    fn str_at(&self, idx: usize) -> Option<Cow<'a, str>>;
 }
 
 impl<'a> Row<'a> for quaint::connector::ResultRowRef<'a> {
@@ -25,8 +25,8 @@ impl<'a> Row<'a> for quaint::connector::ResultRowRef<'a> {
         self.at(idx).and_then(|v| v.as_i64())
     }
 
-    fn str_at(&self, idx: usize) -> Option<&'a str> {
-        self.at(idx).and_then(|v| v.as_str())
+    fn str_at(&self, idx: usize) -> Option<Cow<'a, str>> {
+        self.at(idx).and_then(|v| v.as_str()).map(Cow::Borrowed)
     }
 }
 

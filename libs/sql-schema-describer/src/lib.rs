@@ -18,7 +18,6 @@ pub mod postgres;
 pub mod sqlite;
 pub mod walkers;
 
-use serde::{Deserialize, Serialize};
 pub(crate) mod common;
 
 mod error;

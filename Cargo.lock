@@ -4375,17 +4375,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sql-schema-describer-js"
-version = "0.1.0"
-dependencies = [
- "futures 0.3.14",
- "js-sys",
- "sql-schema-describer",
- "wasm-bindgen",
- "wasm-bindgen-futures",
-]
-
-[[package]]
 name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -169,7 +169,7 @@ impl SqlSchemaDescriber {
 
         for row in iter_rows(result_set.as_ref()) {
             views.push(View {
-                name: row.str_at(0).unwrap().to_owned(),
+                name: row.str_at(0).unwrap().into_owned(),
                 definition: row.str_at(1).map(String::from),
             })
         }
@@ -194,7 +194,7 @@ impl SqlSchemaDescriber {
                 } else {
                     ColumnArity::Nullable
                 };
-                let tpe = get_column_type(row.str_at(2).expect("type"), arity);
+                let tpe = get_column_type(&row.str_at(2).expect("type"), arity);
 
                 let default = match row.str_at(4) {
                     None => None,
@@ -250,7 +250,7 @@ impl SqlSchemaDescriber {
 
                 let pk_col = row.i64_at(5).expect("primary key");
                 let col = Column {
-                    name: row.str_at(1).expect("name").to_owned(),
+                    name: row.str_at(1).expect("name").into_owned(),
                     tpe,
                     default,
                     auto_increment: false,
@@ -336,18 +336,18 @@ impl SqlSchemaDescriber {
             let referenced_table = row.str_at(2).expect("table").to_owned();
             match intermediate_fks.get_mut(&id) {
                 Some(fk) => {
-                    fk.columns.insert(seq, column.to_owned());
+                    fk.columns.insert(seq, column.into_owned());
                     if let Some(column) = referenced_column {
-                        fk.referenced_columns.insert(seq, column.to_owned());
+                        fk.referenced_columns.insert(seq, column.into_owned());
                     };
                 }
                 None => {
                     let mut columns: HashMap<i64, String> = HashMap::new();
-                    columns.insert(seq, column.to_owned());
+                    columns.insert(seq, column.into_owned());
                     let mut referenced_columns: HashMap<i64, String> = HashMap::new();
 
                     if let Some(column) = referenced_column {
-                        referenced_columns.insert(seq, column.to_owned());
+                        referenced_columns.insert(seq, column.into_owned());
                     };
                     let on_delete_action = match row.str_at(6).expect("on_delete").to_lowercase().as_str() {
                         "no action" => ForeignKeyAction::NoAction,
@@ -367,7 +367,7 @@ impl SqlSchemaDescriber {
                     };
                     let fk = IntermediateForeignKey {
                         columns,
-                        referenced_table,
+                        referenced_table: referenced_table.into_owned(),
                         referenced_columns,
                         on_delete_action,
                         on_update_action,
@@ -438,7 +438,7 @@ impl SqlSchemaDescriber {
             let is_unique = row.bool_at(2).expect("get unique");
             let name = row.str_at(1).expect("get name");
             let mut index = Index {
-                name: name.to_owned(),
+                name: name.clone().into_owned(),
                 tpe: match is_unique {
                     true => IndexType::Unique,
                     false => IndexType::Normal,
@@ -457,7 +457,7 @@ impl SqlSchemaDescriber {
                         if index.columns.len() <= pos {
                             index.columns.resize(pos + 1, "".to_string());
                         }
-                        index.columns[pos] = name.to_owned();
+                        index.columns[pos] = name.into_owned();
                     }
                     None => break 'index_loop,
                 }
