@@ -1,3 +1,4 @@
+#[cfg(feature = "quaint")]
 use quaint::{prelude::Queryable, single::Quaint, Value};
 use std::{borrow::Cow, future::Future, pin::Pin};
 
@@ -16,6 +17,7 @@ pub trait Row<'a> {
     fn str_at(&self, idx: usize) -> Option<Cow<'a, str>>;
 }
 
+#[cfg(feature = "quaint")]
 impl<'a> Row<'a> for quaint::connector::ResultRowRef<'a> {
     fn bool_at(&self, idx: usize) -> Option<bool> {
         self.at(idx).and_then(|v| v.as_bool())
@@ -35,6 +37,7 @@ pub trait ResultSet {
     fn row_at(&'_ self, rowidx: usize) -> Option<Box<dyn Row<'_> + '_>>;
 }
 
+#[cfg(feature = "quaint")]
 impl ResultSet for quaint::connector::ResultSet {
     fn len(&self) -> usize {
         quaint::connector::ResultSet::len(self)
@@ -73,6 +76,7 @@ pub trait IoShell {
     fn raw_cmd<'a>(&'a self, query: &'a str) -> BoxFuture<'a, DbResult<()>>;
 }
 
+#[cfg(feature = "quaint")]
 impl IoShell for Quaint {
     fn query<'a>(&'a self, query: &'a str, params: &'a [&'a str]) -> BoxFuture<'a, DbResult<Box<dyn ResultSet>>> {
         let params: Vec<_> = params.iter().map(|s| Value::text(*s)).collect();

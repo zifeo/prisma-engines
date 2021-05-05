@@ -1,11 +1,12 @@
 use crate::Dedup;
 use crate::SqlError;
+use crate::SqlFamily;
+use anyhow::format_err;
 use datamodel::{
     common::RelationNames, Datamodel, DefaultValue as DMLDef, FieldArity, FieldType, IndexDefinition, Model,
     OnDeleteStrategy, RelationField, RelationInfo, ScalarField, ScalarType, ValueGenerator as VG,
 };
 use datamodel_connector::Connector;
-use quaint::connector::SqlFamily;
 use sql_datamodel_connector::SqlDatamodelConnectors;
 use sql_schema_describer::DefaultKind;
 use sql_schema_describer::{Column, ColumnArity, ColumnTypeFamily, ForeignKey, Index, IndexType, SqlSchema, Table};
@@ -204,9 +205,7 @@ pub(crate) fn calculate_backrelation_field(
     relation_info: &RelationInfo,
 ) -> Result<RelationField, SqlError> {
     match schema.table(&model.name) {
-        Err(table_name) => Err(SqlError::SchemaInconsistent {
-            explanation: format!("Table {} not found.", table_name),
-        }),
+        Err(table_name) => Err(format_err!("Table {} not found.", table_name)),
         Ok(table) => {
             let new_relation_info = RelationInfo {
                 name: relation_info.name.clone(),
@@ -292,9 +291,7 @@ pub(crate) fn calculate_relation_name(schema: &SqlSchema, fk: &ForeignKey, table
     fk_to_same_model.clear_duplicates();
 
     match schema.table(referenced_model) {
-        Err(table_name) => Err(SqlError::SchemaInconsistent {
-            explanation: format!("Table {} not found.", table_name),
-        }),
+        Err(table_name) => Err(anyhow::format_err!("Table {} not found.", table_name)),
         Ok(other_table) => {
             let fk_from_other_model_to_this: Vec<&ForeignKey> = other_table
                 .foreign_keys

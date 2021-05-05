@@ -5,9 +5,11 @@ name = "sql-introspection-connector"
 version = "0.1.0"
 
 [features]
+default = []
 vendored-openssl = ["quaint/vendored-openssl"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 
 [dependencies]
 anyhow = "1.0.26"
@@ -23,14 +25,15 @@ regex = "1.2"
 bigdecimal = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
-sql-schema-describer = { path = "../../../libs/sql-schema-describer" }
+sql-schema-describer = { path = "../../../libs/sql-schema-describer", default-features = false }
 thiserror = "1.0.9"
 tokio = { version = "1.0", features = ["rt-multi-thread", "time"] }
 tracing = "0.1.10"
 tracing-futures = "0.2.0"
-user-facing-errors = { path = "../../../libs/user-facing-errors", features = ["sql"] }
+user-facing-errors = { path = "../../../libs/user-facing-errors", features = [] }
 
 [dependencies.quaint]
+optional = true
 git = "https://github.com/prisma/quaint"
 features = [
     "postgresql",

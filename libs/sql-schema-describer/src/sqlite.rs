@@ -7,6 +7,7 @@ use crate::{
     Index, IndexType, Lazy, PrimaryKey, PrismaValue, Regex, SqlMetadata, SqlSchema, SqlSchemaDescriberBackend, Table,
     View,
 };
+#[cfg(feature = "quaint")]
 use quaint::single::Quaint;
 use std::{borrow::Cow, collections::HashMap, convert::TryInto, fmt::Debug};
 use tracing::trace;
@@ -94,6 +95,7 @@ impl Parser for SqlSchemaDescriber {}
 
 impl SqlSchemaDescriber {
     /// Constructor.
+    #[cfg(feature = "quaint")]
     pub fn new(conn: Quaint) -> SqlSchemaDescriber {
         SqlSchemaDescriber { conn: Box::new(conn) }
     }

@@ -11,9 +11,13 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use walkers::{EnumWalker, TableWalker, UserDefinedTypeWalker, ViewWalker};
 
+#[cfg(feature = "quaint")]
 pub mod getters;
+#[cfg(feature = "quaint")]
 pub mod mssql;
+#[cfg(feature = "quaint")]
 pub mod mysql;
+#[cfg(feature = "quaint")]
 pub mod postgres;
 pub mod sqlite;
 pub mod walkers;

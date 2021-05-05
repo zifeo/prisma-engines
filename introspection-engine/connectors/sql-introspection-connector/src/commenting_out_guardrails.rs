@@ -3,9 +3,9 @@ use crate::warnings::{
     warning_models_without_identifier, warning_unsupported_types, EnumAndValue, Model, ModelAndField,
     ModelAndFieldAndType,
 };
+use crate::SqlFamily;
 use datamodel::{Datamodel, FieldType};
 use introspection_connector::Warning;
-use quaint::connector::SqlFamily;
 
 pub fn commenting_out_guardrails(datamodel: &mut Datamodel, family: &SqlFamily) -> Vec<Warning> {
     let mut models_without_identifiers = vec![];

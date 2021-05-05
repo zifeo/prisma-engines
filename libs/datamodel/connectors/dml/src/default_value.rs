@@ -194,11 +194,11 @@ impl ValueGeneratorFn {
     }
 
     fn generate_cuid() -> PrismaValue {
-        PrismaValue::String(cuid::cuid().unwrap())
+        PrismaValue::String(todo!())
     }
 
     fn generate_uuid() -> PrismaValue {
-        PrismaValue::Uuid(Uuid::new_v4())
+        PrismaValue::Uuid(todo!())
     }
 
     fn generate_now() -> PrismaValue {

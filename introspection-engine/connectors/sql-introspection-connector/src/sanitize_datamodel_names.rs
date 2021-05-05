@@ -1,10 +1,10 @@
+use crate::SqlFamily;
 use datamodel::{
     transform::ast_to_dml::reserved_model_names, Datamodel, DefaultValue, Field, FieldType, Model, WithDatabaseName,
     WithName,
 };
 use once_cell::sync::Lazy;
 use prisma_value::PrismaValue;
-use quaint::prelude::SqlFamily;
 use regex::Regex;
 use std::collections::HashMap;
 

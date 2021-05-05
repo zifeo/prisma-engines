@@ -6,8 +6,8 @@ use crate::introspection_helpers::{
 use crate::version_checker::VersionChecker;
 use crate::Dedup;
 use crate::SqlError;
+use crate::SqlFamily;
 use datamodel::{dml, walkers::find_model_by_db_name, Datamodel, Field, Model, RelationField};
-use quaint::connector::SqlFamily;
 use sql_schema_describer::{SqlSchema, Table};
 use tracing::debug;
 

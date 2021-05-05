@@ -1,9 +1,9 @@
 use crate::introspection_helpers::replace_field_names;
 use crate::warnings::*;
+use crate::SqlFamily;
 use datamodel::{Datamodel, DefaultValue, FieldType, Ignorable, ValueGenerator};
 use introspection_connector::Warning;
 use prisma_value::PrismaValue;
-use quaint::connector::SqlFamily;
 use std::cmp::Ordering;
 use std::cmp::Ordering::{Equal, Greater, Less};
 

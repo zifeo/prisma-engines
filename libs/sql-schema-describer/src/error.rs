@@ -49,6 +49,7 @@ impl From<DescriberErrorKind> for DescriberError {
 pub enum DescriberErrorKind {
     /// IoShellError
     IoShellError(io_shell::DatabaseError),
+    #[cfg(feature = "quaint")]
     /// An error originating from Quaint or the database.
     QuaintError(quaint::error::Error),
     /// An illegal cross-schema reference.
@@ -65,6 +66,7 @@ pub enum DescriberErrorKind {
 impl Display for DescriberError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind() {
+            #[cfg(feature = "quaint")]
             DescriberErrorKind::QuaintError(_) => {
                 self.kind().fmt(f)?;
                 self.context.fmt(f)
@@ -78,6 +80,7 @@ impl Display for DescriberErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IoShellError(_) => todo!(),
+            #[cfg(feature = "quaint")]
             Self::QuaintError(err) => err.fmt(f),
             Self::CrossSchemaReference { from, to, constraint } => {
                 write!(
@@ -93,6 +96,7 @@ impl Display for DescriberErrorKind {
 impl Error for DescriberError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match &self.kind {
+            #[cfg(feature = "quaint")]
             DescriberErrorKind::QuaintError(err) => Some(err),
             DescriberErrorKind::CrossSchemaReference { .. } => None,
             DescriberErrorKind::IoShellError(_) => todo!(),
@@ -100,6 +104,7 @@ impl Error for DescriberError {
     }
 }
 
+#[cfg(feature = "quaint")]
 impl From<quaint::error::Error> for DescriberError {
     fn from(err: quaint::error::Error) -> Self {
         DescriberError {
