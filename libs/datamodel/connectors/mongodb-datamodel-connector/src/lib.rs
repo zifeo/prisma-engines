@@ -103,7 +103,7 @@ impl Connector for MongoDbDatamodelConnector {
         {
             let message = if field.is_id() {
                 format!(
-                    "MongoDB `@default(dbgenerated())` IDs must have an `ObjectID` native type annotation. `{}` is an ID field, so you probably want `ObjectId` as your native type.",
+                    "MongoDB `@default(dbgenerated())` IDs must have a native type annotation. `{}` is an ID field, so you probably want `ObjectId` as your native type.",
                     field.name()
                 )
             } else {
