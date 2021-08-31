@@ -22,7 +22,7 @@ pub fn constructor(ctx: CallContext) -> napi::Result<JsUndefined> {
                     .map(|js_string| vec![js_string])
             })?;
 
-    log_callback.unref(&ctx.env)?;
+    //log_callback.unref(&ctx.env)?;
 
     let mut this: JsObject = ctx.this_unchecked();
     let engine = QueryEngine::new(params, log_callback)?;
