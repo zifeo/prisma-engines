@@ -1,7 +1,6 @@
 use super::*;
 use constants::args;
 
-#[tracing::instrument(skip(ctx, model, parent_field))]
 pub(crate) fn update_many_input_types(
     ctx: &mut BuilderContext,
     model: &ModelRef,
@@ -31,7 +30,6 @@ pub(crate) fn checked_update_many_input_type(ctx: &mut BuilderContext, model: &M
 }
 
 /// Builds "<x>UncheckedUpdateManyWithout<y>MutationInput" input object type.
-#[tracing::instrument(skip(ctx, model, parent_field))]
 pub(crate) fn unchecked_update_many_input_type(
     ctx: &mut BuilderContext,
     model: &ModelRef,
@@ -58,7 +56,6 @@ pub(crate) fn unchecked_update_many_input_type(
 
 /// Builds "<x>UpdateManyWithWhereWithout<y>Input" input object type.
 /// Simple combination object of "where" and "data".
-#[tracing::instrument(skip(ctx, parent_field))]
 pub(crate) fn update_many_where_combination_object(
     ctx: &mut BuilderContext,
     parent_field: &RelationFieldRef,

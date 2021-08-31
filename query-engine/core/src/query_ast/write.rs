@@ -19,7 +19,6 @@ pub enum WriteQuery {
 }
 
 impl WriteQuery {
-    #[tracing::instrument(skip(self, projection))]
     pub fn inject_projection_into_args(&mut self, projection: RecordProjection) {
         let keys: Vec<_> = projection.fields().map(|sf| sf.db_name().to_owned()).collect();
         let values: Vec<_> = projection.values().collect();
@@ -40,7 +39,6 @@ impl WriteQuery {
         args.update_datetimes(model);
     }
 
-    #[tracing::instrument(skip(self, projection))]
     pub fn returns(&self, projection: &ModelProjection) -> bool {
         let returns_id = &self.model().primary_identifier() == projection;
 
@@ -61,7 +59,6 @@ impl WriteQuery {
         }
     }
 
-    #[tracing::instrument(skip(self))]
     pub fn model(&self) -> ModelRef {
         match self {
             Self::CreateRecord(q) => Arc::clone(&q.model),
@@ -135,7 +132,6 @@ pub struct CreateManyRecords {
 }
 
 impl CreateManyRecords {
-    #[tracing::instrument(skip(self, projection))]
     pub fn inject_all(&mut self, projection: RecordProjection) {
         let keys: Vec<_> = projection.fields().map(|sf| sf.db_name().to_owned()).collect();
         let values: Vec<_> = projection.values().collect();

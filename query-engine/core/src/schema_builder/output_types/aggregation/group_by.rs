@@ -4,7 +4,6 @@ use super::*;
 use std::convert::identity;
 
 /// Builds group by aggregation object type for given model (e.g. GroupByUserOutputType).
-#[tracing::instrument(skip(ctx, model))]
 pub(crate) fn group_by_output_object_type(ctx: &mut BuilderContext, model: &ModelRef) -> ObjectTypeWeakRef {
     let ident = Identifier::new(
         format!("{}GroupByOutputType", capitalize(&model.name)),

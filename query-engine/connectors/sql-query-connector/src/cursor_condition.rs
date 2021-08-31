@@ -105,7 +105,6 @@ struct CursorOrderDefinition {
 ///     OR `main`.`ModelA`.`modelB_id` IS NULL -- >>> Additional check for the nullable foreign key
 ///   )
 /// ```
-#[tracing::instrument(name = "build_cursor_condition", skip(query_arguments, model, ordering_joins))]
 pub fn build(
     query_arguments: &QueryArguments,
     model: &ModelRef,

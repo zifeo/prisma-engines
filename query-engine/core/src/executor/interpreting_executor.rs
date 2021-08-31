@@ -37,7 +37,6 @@ where
     }
 
     /// Execute the operation as a self-contained operation, if necessary wrapped in a transaction.
-    #[tracing::instrument(skip(conn, graph, serializer, force_transactions))]
     async fn execute_self_contained(
         mut conn: Box<dyn Connection>,
         graph: QueryGraph,
@@ -61,7 +60,6 @@ where
     }
 
     /// Simplest execution on anything that's a ConnectionLike. Caller decides handling of connections and transactions.
-    #[tracing::instrument(skip(conn, graph, serializer))]
     async fn execute_on(
         conn: &mut dyn ConnectionLike,
         graph: QueryGraph,
@@ -144,7 +142,6 @@ where
     /// A failing operation does not fail the batch, instead, an error is returned alongside other responses.
     /// Note that individual operations executed in non-transactional mode can still be transactions in themselves
     /// if the query (e.g. a write op) requires it.
-    #[tracing::instrument(skip(self, operations, query_schema))]
     async fn execute_all(
         &self,
         tx_id: Option<TxId>,

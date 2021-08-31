@@ -9,7 +9,6 @@ use connector::IdFilter;
 use prisma_models::ModelRef;
 use std::{convert::TryInto, sync::Arc};
 
-#[tracing::instrument(skip(graph, model, field))]
 pub fn upsert_record(
     graph: &mut QueryGraph,
     connector_ctx: &ConnectorContext,

@@ -215,7 +215,6 @@ impl QueryGraph {
         Ok(graph)
     }
 
-    #[tracing::instrument(skip(self))]
     pub fn finalize(&mut self) -> QueryGraphResult<()> {
         if !self.finalized {
             self.swap_marked()?;
@@ -517,7 +516,6 @@ impl QueryGraph {
     ///                                                                                                         └───┘
     /// ```
     /// [DTODO] put if flow exception illustration here.
-    #[tracing::instrument(skip(self))]
     fn swap_marked(&mut self) -> QueryGraphResult<()> {
         if !self.marked_node_pairs.is_empty() {
             trace!("[Graph][Swap] Before shape: {}", self);
@@ -614,7 +612,6 @@ impl QueryGraph {
     ///         sibling   │                                ─ ─ ─ ─ ─ ─ ┘
     ///      └ ─ ─ ─ ─ ─ ─
     /// ```
-    #[tracing::instrument(skip(self))]
     fn normalize_if_nodes(&mut self) -> QueryGraphResult<()> {
         for node_ix in self.graph.node_indices() {
             let node = NodeRef { node_ix };
@@ -700,7 +697,6 @@ impl QueryGraph {
     ///
     /// The `Reload` node is always a find many query.
     /// Unwraps are safe because we're operating on the unprocessed state of the graph (`Expressionista` changes that).
-    #[tracing::instrument(skip(self))]
     fn insert_reloads(&mut self) -> QueryGraphResult<()> {
         let reloads: Vec<(NodeRef, ModelRef, Vec<ModelProjection>)> = self
             .graph

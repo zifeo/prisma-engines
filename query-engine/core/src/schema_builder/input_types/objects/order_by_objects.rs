@@ -3,7 +3,6 @@ use constants::{aggregations, deprecation, ordering};
 use output_types::aggregation;
 
 /// Builds "<Model>OrderByInput" object types.
-#[tracing::instrument(skip(ctx, model, include_relations))]
 pub(crate) fn order_by_object_type(
     ctx: &mut BuilderContext,
     model: &ModelRef,

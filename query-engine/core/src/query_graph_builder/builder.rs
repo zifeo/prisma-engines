@@ -49,7 +49,6 @@ impl QueryGraphBuilder {
     }
 
     /// Maps an operation to a query.
-    #[tracing::instrument(skip(self, operation))]
     pub fn build(self, operation: Operation) -> QueryGraphBuilderResult<(QueryGraph, IrSerializer)> {
         match operation {
             Operation::Read(selection) => self.build_internal(selection, &self.query_schema.query()),
@@ -57,7 +56,6 @@ impl QueryGraphBuilder {
         }
     }
 
-    #[tracing::instrument(skip(self, selection, root_object))]
     fn build_internal(
         &self,
         selection: Selection,
@@ -82,7 +80,6 @@ impl QueryGraphBuilder {
         }
     }
 
-    #[tracing::instrument(skip(self, field_pair))]
     #[rustfmt::skip]
     fn dispatch_build(&self, field_pair: FieldPair) -> QueryGraphBuilderResult<QueryGraph> {
         let query_info = field_pair.schema_field.query_info.as_ref().unwrap();

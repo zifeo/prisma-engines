@@ -6,7 +6,6 @@ use connector::{Filter, JsonCompare, JsonFilterPath, JsonTargetType, ScalarCompa
 use prisma_models::{PrismaValue, ScalarFieldRef, TypeIdentifier};
 use std::convert::TryInto;
 
-#[tracing::instrument(name = "parse_scalar_field", skip(input_map, reverse))]
 pub fn parse(
     mut input_map: ParsedInputMap,
     field: &ScalarFieldRef,

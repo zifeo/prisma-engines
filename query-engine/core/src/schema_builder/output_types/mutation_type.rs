@@ -6,7 +6,6 @@ use input_types::input_fields;
 use prisma_models::{dml, PrismaValue};
 
 /// Builds the root `Mutation` type.
-#[tracing::instrument(skip(ctx))]
 pub(crate) fn build(ctx: &mut BuilderContext) -> (OutputType, ObjectTypeStrongRef) {
     let non_embedded_models = ctx.internal_data_model.non_embedded_models();
     let mut fields: Vec<OutputField> = non_embedded_models
@@ -46,7 +45,6 @@ pub(crate) fn build(ctx: &mut BuilderContext) -> (OutputType, ObjectTypeStrongRe
 }
 
 // implementation note: these need to be in the same function, because these vecs interact: the create inputs will enqueue update inputs, and vice versa.
-#[tracing::instrument(skip(ctx))]
 fn create_nested_inputs(ctx: &mut BuilderContext) {
     let mut nested_create_inputs_queue = std::mem::take(&mut ctx.nested_create_inputs_queue);
     let mut nested_update_inputs_queue = std::mem::take(&mut ctx.nested_update_inputs_queue);

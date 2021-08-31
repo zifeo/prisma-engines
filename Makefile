@@ -7,6 +7,9 @@ default: build
 build:
 	cargo build
 
+napi:
+	cargo build --release && mv target/release/libquery_engine.so target/release/libquery_engine.so.node
+
 # Emulate pedantic CI compilation.
 pedantic:
 	RUSTFLAGS="-D warnings" cargo fmt -- --check && RUSTFLAGS="-D warnings" cargo clippy --all-targets

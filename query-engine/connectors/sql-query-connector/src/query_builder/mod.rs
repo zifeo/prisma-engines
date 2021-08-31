@@ -9,7 +9,6 @@ use quaint::ast::{Column, Comparable, ConditionTree, Query, Row, Values};
 
 const PARAMETER_LIMIT: usize = 2000;
 
-#[tracing::instrument(skip(columns, records, f))]
 pub(super) fn chunked_conditions<F, Q>(
     columns: &[Column<'static>],
     records: &[&RecordProjection],
@@ -28,7 +27,6 @@ where
         .collect()
 }
 
-#[tracing::instrument(skip(columns, records))]
 pub(super) fn conditions<'a>(
     columns: &'a [Column<'static>],
     records: impl IntoIterator<Item = &'a RecordProjection>,

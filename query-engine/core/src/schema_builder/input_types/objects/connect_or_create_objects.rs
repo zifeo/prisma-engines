@@ -2,7 +2,6 @@ use super::*;
 use constants::args;
 
 /// Builds "<x>CreateOrConnectNestedInput" input object types.
-#[tracing::instrument(skip(ctx, parent_field))]
 pub(crate) fn nested_connect_or_create_input_object(
     ctx: &mut BuilderContext,
     parent_field: &RelationFieldRef,

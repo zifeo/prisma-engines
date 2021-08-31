@@ -40,7 +40,6 @@ impl SelectDefinition for Select<'static> {
 }
 
 impl SelectDefinition for QueryArguments {
-    #[tracing::instrument(skip(self, model, aggr_selections))]
     fn into_select(
         self,
         model: &ModelRef,
@@ -95,7 +94,6 @@ impl SelectDefinition for QueryArguments {
     }
 }
 
-#[tracing::instrument(skip(model, columns, aggr_selections, query))]
 pub fn get_records<T>(
     model: &ModelRef,
     columns: impl Iterator<Item = Column<'static>>,
@@ -137,7 +135,6 @@ where
 /// ```
 /// Important note: Do not use the AsColumn trait here as we need to construct column references that are relative,
 /// not absolute - e.g. `SELECT "field" FROM (...)` NOT `SELECT "full"."path"."to"."field" FROM (...)`.
-#[tracing::instrument(skip(model, selections, args))]
 pub fn aggregate(model: &ModelRef, selections: &[AggregationSelection], args: QueryArguments) -> Select<'static> {
     let columns = extract_columns(model, &selections);
     let sub_query = get_records(model, columns.into_iter(), &[], args);
@@ -178,7 +175,6 @@ pub fn aggregate(model: &ModelRef, selections: &[AggregationSelection], args: Qu
         })
 }
 
-#[tracing::instrument(skip(model, args, selections, group_by, having))]
 pub fn group_by_aggregate(
     model: &ModelRef,
     args: QueryArguments,
@@ -230,7 +226,6 @@ pub fn group_by_aggregate(
     }
 }
 
-#[tracing::instrument(skip(model, selections))]
 fn extract_columns(model: &ModelRef, selections: &[AggregationSelection]) -> Vec<Column<'static>> {
     let fields: Vec<_> = selections
         .iter()

@@ -85,7 +85,6 @@ impl<'a> GraphQlHandler<'a> {
         }
     }
 
-    #[tracing::instrument(skip(self, document))]
     async fn handle_compacted(&self, document: CompactedDocument, tx_id: Option<TxId>) -> PrismaResponse {
         use user_facing_errors::Error;
 

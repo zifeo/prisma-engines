@@ -2,7 +2,6 @@ use crate::constants::args;
 
 use super::*;
 
-#[tracing::instrument(skip(ctx, parent_field))]
 pub(crate) fn nested_upsert_input_object(
     ctx: &mut BuilderContext,
     parent_field: &RelationFieldRef,
@@ -15,7 +14,6 @@ pub(crate) fn nested_upsert_input_object(
 }
 
 /// Builds "<x>UpsertWithWhereUniqueNestedInput" / "<x>UpsertWithWhereUniqueWithout<y>Input" input object types.
-#[tracing::instrument(skip(ctx, parent_field))]
 fn nested_upsert_list_input_object(
     ctx: &mut BuilderContext,
     parent_field: &RelationFieldRef,
@@ -57,7 +55,6 @@ fn nested_upsert_list_input_object(
 }
 
 /// Builds "<x>UpsertNestedInput" / "<x>UpsertWithout<y>Input" input object types.
-#[tracing::instrument(skip(ctx, parent_field))]
 fn nested_upsert_nonlist_input_object(
     ctx: &mut BuilderContext,
     parent_field: &RelationFieldRef,

@@ -36,7 +36,6 @@ pub struct DiffResult {
 
 impl ExpressionResult {
     /// Attempts to transform the result into a vector of record projections.
-    #[tracing::instrument(skip(self, model_projection))]
     pub fn as_projections(&self, model_projection: &ModelProjection) -> InterpretationResult<Vec<RecordProjection>> {
         let converted = match self {
             Self::Query(ref result) => match result {
@@ -76,7 +75,6 @@ impl ExpressionResult {
         })
     }
 
-    #[tracing::instrument(skip(self))]
     pub fn as_query_result(&self) -> InterpretationResult<&QueryResult> {
         let converted = match self {
             Self::Query(ref q) => Some(q),
@@ -88,7 +86,6 @@ impl ExpressionResult {
         })
     }
 
-    #[tracing::instrument(skip(self))]
     pub fn as_diff_result(&self) -> InterpretationResult<&DiffResult> {
         let converted = match self {
             Self::Computation(ComputationResult::Diff(ref d)) => Some(d),
@@ -149,7 +146,6 @@ impl<'conn> QueryInterpreter<'conn> {
         Self { conn, log }
     }
 
-    #[tracing::instrument(skip(self, exp, env, level))]
     pub fn interpret(
         &mut self,
         exp: Expression,
@@ -260,7 +256,6 @@ impl<'conn> QueryInterpreter<'conn> {
         }
     }
 
-    #[tracing::instrument(skip(self))]
     pub fn log_output(&self) -> String {
         let mut output = String::with_capacity(self.log.len() * 30);
 
