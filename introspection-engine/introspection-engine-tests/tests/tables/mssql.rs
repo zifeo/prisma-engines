@@ -40,6 +40,32 @@ async fn default_values(api: &TestApi) -> TestResult {
 }
 
 #[test_connector(tags(Mssql))]
+async fn multi_line_default_values_should_work(api: &TestApi) -> TestResut {
+    let setup = format!(
+        r#"
+        CREATE TABLE [{schema_name}].[A] (
+            id INTEGER IDENTITY,
+            text NVARCHAR(1000) CONSTRAINT [charconstraint] DEFAULT '\r\n/****** Object:  Default [dbo].[Default_0]    Script Date: 04/02/2009 17:47:36 ******/\r\ncreate default [dbo].[Default_P] as \'P\'\r\n\r\n\r\n'
+        );
+    "#,
+        schema_name = api.schema_name()
+    );
+
+    api.raw_cmd(&setup).await;
+
+    let expected = expect![[r#"
+        model Test {
+          id   Int     @id
+          text String? @default("\r\n/****** Object:  Default [dbo].[Default_0]    Script Date: 04/02/2009 17:47:36 ******/\r\ncreate default [dbo].[Default_P] as \ncreate default [dbo].[Default_P] as \'P\'\r\n\r\n\r\n", map: "charconstraint") @db.NVarChar(1000)
+        }
+    "#]];
+
+    expected.assert_eq(&api.introspect_dml().await?);
+
+    Ok(())
+}
+
+#[test_connector(tags(Mssql))]
 async fn negative_default_values_should_work(api: &TestApi) -> TestResult {
     let setup = format!(
         r#"
