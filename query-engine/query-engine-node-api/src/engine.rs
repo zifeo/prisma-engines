@@ -20,6 +20,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 /// promises.
 #[derive(Clone)]
 pub struct QueryEngine {
+    telemetry: TelemetryOptions,
     inner: Arc<RwLock<Inner>>,
 }
 
@@ -92,13 +93,13 @@ pub struct ConstructorOptions {
     #[serde(default)]
     env: serde_json::Value,
     #[serde(default)]
-    telemetry: TelemetryOptions,
+    open_telemetry: TelemetryOptions,
     config_dir: PathBuf,
     #[serde(default)]
     ignore_env_var_errors: bool,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TelemetryOptions {
     enabled: bool,
@@ -116,7 +117,7 @@ impl QueryEngine {
             log_queries,
             datasource_overrides,
             env,
-            telemetry,
+            open_telemetry,
             config_dir,
             ignore_env_var_errors,
         } = opts;
@@ -149,11 +150,8 @@ impl QueryEngine {
 
         let datamodel = EngineDatamodel { ast, raw: datamodel };
 
-        let logger = if telemetry.enabled {
-            ChannelLogger::new_with_telemetry(log_callback, telemetry.endpoint)
-        } else {
-            ChannelLogger::new(&log_level, log_queries, log_callback)
-        };
+        let callback = log_callback.clone();
+        let logger = ChannelLogger::new(&log_level, log_queries, callback);
 
         let builder = EngineBuilder {
             datamodel,
@@ -164,6 +162,7 @@ impl QueryEngine {
         };
 
         Ok(Self {
+            telemetry: open_telemetry,
             inner: Arc::new(RwLock::new(Inner::Builder(builder))),
         })
     }
@@ -174,9 +173,14 @@ impl QueryEngine {
 
         match *inner {
             Inner::Builder(ref builder) => {
-                let engine = builder
-                    .logger
-                    .clone()
+                // If telemetry is enabled, set the logger to the telemetry tracer
+                let logger = if self.telemetry.enabled {
+                    ChannelLogger::new_with_telemetry(builder.logger.clone(), self.telemetry.endpoint.clone()).await?
+                } else {
+                    builder.logger.clone()
+                };
+
+                let engine = logger.clone()
                     .with_logging(|| async move {
                         // We only support one data source & generator at the moment, so take the first one (default not exposed yet).
                         let data_source = builder
@@ -212,13 +216,59 @@ impl QueryEngine {
                         Ok(ConnectedEngine {
                             datamodel: builder.datamodel.clone(),
                             query_schema: Arc::new(query_schema),
-                            logger: builder.logger.clone(),
+                            logger,
                             executor,
                             config_dir: builder.config_dir.clone(),
                             env: builder.env.clone(),
                         })
                     })
                     .await?;
+
+                // let engine = builder
+                //     .logger
+                //     .clone()
+                //     .with_logging(|| async move {
+                //         // We only support one data source & generator at the moment, so take the first one (default not exposed yet).
+                //         let data_source = builder
+                //             .config
+                //             .subject
+                //             .datasources
+                //             .first()
+                //             .ok_or_else(|| ApiError::configuration("No valid data source found"))?;
+
+                //         let preview_features: Vec<_> = builder.config.subject.preview_features().iter().collect();
+                //         let url = data_source
+                //             .load_url_with_config_dir(&builder.config_dir, |key| {
+                //                 builder.env.get(key).map(ToString::to_string)
+                //             })
+                //             .map_err(|err| crate::error::ApiError::Conversion(err, builder.datamodel.raw.clone()))?;
+
+                //         let (db_name, executor) = executor::load(data_source, &preview_features, &url).await?;
+                //         let connector = executor.primary_connector();
+                //         connector.get_connection().await?;
+
+                //         // Build internal data model
+                //         let internal_data_model = InternalDataModelBuilder::from(&builder.datamodel.ast).build(db_name);
+
+                //         let query_schema = schema_builder::build(
+                //             internal_data_model,
+                //             BuildMode::Modern,
+                //             true, // enable raw queries
+                //             data_source.capabilities(),
+                //             preview_features,
+                //             data_source.referential_integrity(),
+                //         );
+
+                //         Ok(ConnectedEngine {
+                //             datamodel: builder.datamodel.clone(),
+                //             query_schema: Arc::new(query_schema),
+                //             logger: builder.logger.clone(),
+                //             executor,
+                //             config_dir: builder.config_dir.clone(),
+                //             env: builder.env.clone(),
+                //         })
+                //     })
+                //     .await?;
 
                 *inner = Inner::Connected(engine);
 

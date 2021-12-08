@@ -33,12 +33,14 @@ enum Subscriber {
 #[derive(Clone)]
 pub struct ChannelLogger {
     subscriber: Subscriber,
+    log_callback: ThreadsafeFunction<String>,
 }
 
 impl ChannelLogger {
     /// Creates a new instance of a logger with the minimum log level.
     pub fn new(level: &str, log_queries: bool, callback: ThreadsafeFunction<String>) -> Self {
         let mut filter = EnvFilter::new(level);
+        let log_callback = callback.clone();
 
         if log_queries {
             filter = filter.add_directive("quaint[{is_query}]".parse().unwrap());
@@ -49,13 +51,14 @@ impl ChannelLogger {
 
         let subscriber = Subscriber::Normal(subscriber);
 
-        Self { subscriber }
+        Self { subscriber, log_callback }
     }
 
     /// Creates a new instance of a logger with the `trace` minimum level.
     /// Enables tracing events to OTLP endpoint.
-    pub fn new_with_telemetry(callback: ThreadsafeFunction<String>, endpoint: Option<String>) -> Self {
-        let javascript_cb = EventChannel::new(callback, EnvFilter::new("trace"), true);
+    pub async fn new_with_telemetry(logger: ChannelLogger, endpoint: Option<String>) -> crate::Result<Self> {
+        let log_callback = logger.log_callback.clone();
+        let javascript_cb = EventChannel::new(logger.log_callback, EnvFilter::new("trace"), true);
 
         global::set_text_map_propagator(TraceContextPropagator::new());
 
@@ -72,7 +75,10 @@ impl ChannelLogger {
 
         builder = builder.with_exporter(exporter);
 
-        let tracer = builder.install_batch(opentelemetry::runtime::AsyncStd).unwrap();
+        //let tracer = builder.install_simple().unwrap();
+        //let tracer = builder.install_batch(opentelemetry::runtime::AsyncStd).unwrap();
+        let tracer = builder.install_batch(opentelemetry::runtime::Tokio).unwrap();
+        //let tracer = builder.install_batch(opentelemetry::runtime::TokioCurrentThread).unwrap();
 
         let telemetry_layer = tracing_opentelemetry::layer().with_tracer(tracer);
         let registry = EventRegistry::new().with(telemetry_layer).with(javascript_cb);
@@ -80,7 +86,7 @@ impl ChannelLogger {
 
         let subscriber = Subscriber::WithTelemetry(with_telemetry);
 
-        Self { subscriber }
+        Ok(Self { subscriber, log_callback })
     }
 
     /// Wraps a future to a logger, storing all events in the pipeline to

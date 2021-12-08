@@ -31,6 +31,17 @@ pub fn constructor(ctx: CallContext) -> napi::Result<JsUndefined> {
     ctx.env.get_undefined()
 }
 
+// #[js_function(0)]
+// pub fn init_telemetry(ctx: CallContext) -> napi::Result<JsObject> {
+//     let this: JsObject = ctx.this_unchecked();
+//     let engine: &QueryEngine = ctx.env.unwrap(&this)?;
+//     let engine = engine.clone();
+
+//     ctx.env.execute_tokio_future(async move { Ok(engine.init_telemetry(Option::None).await?) }, |env, _| {
+//         env.get_undefined()
+//     })
+// }
+
 #[js_function(0)]
 pub fn connect(ctx: CallContext) -> napi::Result<JsObject> {
     let this: JsObject = ctx.this_unchecked();

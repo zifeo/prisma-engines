@@ -108,11 +108,11 @@ impl<'a> Logger<'a> {
 
             builder = builder.with_exporter(exporter);
 
-            // TODO: Use async batch exporter
             let tracer = builder.install_batch(opentelemetry::runtime::AsyncStd).unwrap();
 
             let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 
+            // NOTE: Who is this subscriber?
             subscriber::set_global_default(subscriber.with(telemetry))?;
 
             Ok(())
