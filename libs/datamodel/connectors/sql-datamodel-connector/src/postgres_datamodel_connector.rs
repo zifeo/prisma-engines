@@ -1,11 +1,13 @@
 use datamodel_connector::{
     connector_error::ConnectorError,
     helper::{arg_vec_from_opt, args_vec_from_opt, parse_one_opt_u32, parse_two_opt_u32},
+    parser_database::walkers::ModelWalker,
+    walker_ext_traits::*,
     Connector, ConnectorCapability, ConstraintScope, ReferentialIntegrity,
 };
 use dml::{
-    field::FieldType, model::Model, native_type_constructor::NativeTypeConstructor,
-    native_type_instance::NativeTypeInstance, relation_info::ReferentialAction, scalars::ScalarType,
+    native_type_constructor::NativeTypeConstructor, native_type_instance::NativeTypeInstance,
+    relation_info::ReferentialAction, scalars::ScalarType,
 };
 use enumflags2::BitFlags;
 use native_types::PostgresType::{self, *};
@@ -83,15 +85,18 @@ const CAPABILITIES: &[ConnectorCapability] = &[
     ConnectorCapability::CreateManyWriteableAutoIncId,
     ConnectorCapability::CreateSkipDuplicates,
     ConnectorCapability::Enums,
+    ConnectorCapability::EnumArrayPush,
     ConnectorCapability::FullTextSearchWithoutIndex,
     ConnectorCapability::InsensitiveFilters,
     ConnectorCapability::Json,
     ConnectorCapability::JsonFilteringArrayPath,
+    ConnectorCapability::JsonFilteringAlphanumeric,
     ConnectorCapability::NamedForeignKeys,
     ConnectorCapability::NamedPrimaryKeys,
     ConnectorCapability::QueryRaw,
     ConnectorCapability::RelationFieldsInArbitraryOrder,
     ConnectorCapability::ScalarLists,
+    ConnectorCapability::JsonLists,
     ConnectorCapability::UpdateableId,
     ConnectorCapability::WritableAutoincField,
     ConnectorCapability::UsingHashIndex,
@@ -220,20 +225,15 @@ impl Connector for PostgresDatamodelConnector {
         }
     }
 
-    fn validate_model(&self, model: &Model, errors: &mut Vec<ConnectorError>) {
-        for index_definition in model.indices.iter() {
-            let fields = index_definition
-                .fields
-                .iter()
-                .map(|f| model.find_field(&f.name).unwrap());
-
-            for field in fields {
-                if let FieldType::Scalar(_, _, Some(native_type)) = field.field_type() {
+    fn validate_model(&self, model: ModelWalker<'_, '_>, errors: &mut Vec<ConnectorError>) {
+        for index in model.indexes() {
+            for field in index.fields() {
+                if let Some(native_type) = field.native_type_instance(self) {
                     let r#type: PostgresType = native_type.deserialize_native_type();
                     let error = self.native_instance_error(&native_type);
 
                     if r#type == PostgresType::Xml {
-                        if index_definition.is_unique() {
+                        if index.is_unique() {
                             errors.push(error.new_incompatible_native_type_with_unique())
                         } else {
                             errors.push(error.new_incompatible_native_type_with_index())

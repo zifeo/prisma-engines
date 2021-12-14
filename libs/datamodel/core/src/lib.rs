@@ -83,16 +83,16 @@ mod configuration;
 mod transform;
 
 pub use crate::dml::*;
-use ast::reformat::MissingField;
 pub use configuration::{Configuration, Datasource, Generator, StringFromEnvVar};
 pub use diagnostics;
-pub use transform::ast_to_dml::reserved_model_names;
+pub use parser_database::is_reserved_type_name;
 
 use crate::{ast::SchemaAst, common::preview_features::PreviewFeature};
+use ast::reformat::MissingField;
 use diagnostics::{Diagnostics, Validated};
 use enumflags2::BitFlags;
 use transform::{
-    ast_to_dml::{DatasourceLoader, GeneratorLoader, ValidationPipeline},
+    ast_to_dml::{validate, DatasourceLoader, GeneratorLoader},
     dml_to_ast::{self, GeneratorSerializer, LowerDmlToAst},
 };
 
@@ -146,9 +146,7 @@ fn parse_datamodel_internal(
 
     diagnostics.to_result()?;
 
-    let validator = ValidationPipeline::new(&datasources, preview_features);
-
-    match validator.validate(&ast, transform) {
+    match validate(&ast, &datasources, preview_features, transform) {
         Ok(mut src) => {
             src.warnings.append(diagnostics.warnings_mut());
             Ok(Validated {

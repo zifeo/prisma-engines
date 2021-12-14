@@ -5,7 +5,6 @@ pub(super) mod one_to_one;
 mod visited_relation;
 
 use crate::{
-    ast,
     common::provider_names::MONGODB_SOURCE_NAME,
     diagnostics::DatamodelError,
     transform::ast_to_dml::{
@@ -16,8 +15,9 @@ use crate::{
         validation_pipeline::context::Context,
     },
 };
-use datamodel_connector::{Connector, ConnectorCapability, ReferentialIntegrity};
+use datamodel_connector::{walker_ext_traits::*, Connector, ConnectorCapability, ReferentialIntegrity};
 use itertools::Itertools;
+use parser_database::walkers::RelationFieldWalker;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     rc::Rc,
@@ -35,25 +35,24 @@ const STATE_ERROR: &str = "Failed lookup of model, field or optional property du
 /// Validates per database that we do not use a name that is already in use.
 pub(super) fn has_a_unique_constraint_name(
     names: &super::Names<'_>,
-    relation: CompleteInlineRelationWalker<'_, '_>,
+    relation: InlineRelationWalker<'_, '_>,
     ctx: &mut Context<'_>,
 ) {
-    let name = match relation.foreign_key_name(ctx.connector) {
-        Some(name) => name,
-        None => return,
-    };
-
-    let field = relation.referencing_field();
+    let name = relation.constraint_name(ctx.connector);
     let model = relation.referencing_model();
 
     for violation in names
         .constraint_namespace
         .scope_violations(model.model_id(), ConstraintName::Relation(name.as_ref()))
     {
-        let span = field
-            .ast_field()
-            .span_for_argument("relation", "map")
-            .unwrap_or_else(|| field.ast_field().span);
+        let span = relation
+            .forward_relation_field()
+            .map(|rf| {
+                rf.ast_field()
+                    .span_for_argument("relation", "map")
+                    .unwrap_or_else(|| rf.ast_field().span)
+            })
+            .unwrap_or_else(|| relation.referenced_model().ast_model().span);
 
         let message = format!(
             "The given constraint name `{}` has to be unique in the following namespace: {}. Please provide a different name using the `map` argument.",
@@ -70,22 +69,40 @@ pub(super) fn has_a_unique_constraint_name(
 }
 
 /// Required relational fields should point to required scalar fields.
-pub(super) fn field_arity(relation: CompleteInlineRelationWalker<'_, '_>, ctx: &mut Context<'_>) {
-    if !relation.referencing_field().ast_field().arity.is_required() {
+pub(super) fn field_arity(relation: InlineRelationWalker<'_, '_>, ctx: &mut Context<'_>) {
+    let forward_relation_field = if let Some(f) = relation.forward_relation_field() {
+        f
+    } else {
+        return;
+    };
+
+    if !forward_relation_field.ast_field().arity.is_required() {
         return;
     }
 
-    if !relation.referencing_fields().any(|field| field.is_optional()) {
-        return;
-    }
+    match relation.referencing_fields() {
+        ReferencingFields::Concrete(mut fields) => {
+            if fields.any(|field| field.is_optional()) {
+                fields
+            } else {
+                return;
+            }
+        }
+        _ => return,
+    };
+
+    let scalar_field_names: Vec<&str> = match relation.referencing_fields() {
+        ReferencingFields::Concrete(fields) => fields.map(|f| f.name()).collect(),
+        _ => unreachable!(),
+    };
 
     ctx.push_error(DatamodelError::new_validation_error(
         format!(
             "The relation field `{}` uses the scalar fields {}. At least one of those fields is optional. Hence the relation field must be optional as well.",
-            relation.referencing_field().name(),
-            relation.referencing_fields().map(|field| field.name()).join(", "),
+            forward_relation_field.name(),
+            scalar_field_names.join(", "),
         ),
-        relation.referencing_field().ast_field().span
+        forward_relation_field.ast_field().span
     ));
 }
 
@@ -282,15 +299,17 @@ pub(super) fn multiple_cascading_paths(relation: CompleteInlineRelationWalker<'_
         return;
     }
 
-    if !relation
-        .on_delete(ctx.connector, ctx.referential_integrity)
-        .triggers_modification()
-        && !relation.on_update().triggers_modification()
-    {
+    let triggers_modifications = |relation: &CompleteInlineRelationWalker<'_, '_>| {
+        relation
+            .on_delete(ctx.connector, ctx.referential_integrity)
+            .triggers_modification()
+            || relation.on_update().triggers_modification()
+    };
+
+    if !triggers_modifications(&relation) {
         return;
     }
 
-    let mut visited = HashSet::new();
     let parent_model = relation.referencing_model();
 
     // Gather all paths from this model to any other model, skipping
@@ -304,20 +323,21 @@ pub(super) fn multiple_cascading_paths(relation: CompleteInlineRelationWalker<'_
     let mut next_relations: Vec<_> = relation
         .referencing_model()
         .complete_inline_relations_from()
-        .filter(|relation| {
-            relation
-                .on_delete(ctx.connector, ctx.referential_integrity)
-                .triggers_modification()
-                || relation.on_update().triggers_modification()
+        .filter(triggers_modifications)
+        .map(|relation| {
+            (
+                relation,
+                Rc::new(VisitedRelation::root(relation)),
+                HashSet::<RelationFieldWalker<'_, '_>>::new(),
+            )
         })
-        .map(|relation| (relation, Rc::new(VisitedRelation::root(relation))))
         .collect();
 
-    while let Some((next_relation, visited_relations)) = next_relations.pop() {
+    while let Some((next_relation, visited_relations, mut current_path)) = next_relations.pop() {
         let model = next_relation.referencing_model();
         let related_model = next_relation.referenced_model();
 
-        visited.insert(next_relation.referencing_field());
+        current_path.insert(next_relation.referencing_field());
 
         // Self-relations are detected elsewhere.
         if model == related_model {
@@ -331,8 +351,15 @@ pub(super) fn multiple_cascading_paths(relation: CompleteInlineRelationWalker<'_
 
         let mut forward_relations = related_model
             .complete_inline_relations_from()
-            .filter(|relation| !visited.contains(&relation.referencing_field()))
-            .map(|relation| (relation, Rc::new(visited_relations.link_next(relation))))
+            .filter(triggers_modifications)
+            .filter(|relation| !current_path.contains(&relation.referencing_field()))
+            .map(|relation| {
+                (
+                    relation,
+                    Rc::new(visited_relations.link_next(relation)),
+                    current_path.clone(),
+                )
+            })
             .peekable();
 
         // If the related model does not have any paths to other models, we
@@ -340,9 +367,6 @@ pub(super) fn multiple_cascading_paths(relation: CompleteInlineRelationWalker<'_
         // inspection.
         if forward_relations.peek().is_none() {
             paths.push(visited_relations.link_next(next_relation));
-
-            // We want to re-visit the same fields if coming from another path.
-            visited.clear();
 
             continue;
         }
@@ -417,7 +441,7 @@ fn cascade_error_with_default_values(
     referential_integrity: ReferentialIntegrity,
     msg: &str,
 ) -> DatamodelError {
-    let on_delete = match relation.referencing_field().attributes().on_delete {
+    let on_delete = match relation.referencing_field().explicit_on_delete() {
         None if relation
             .on_delete(connector, referential_integrity)
             .triggers_modification() =>
@@ -427,7 +451,7 @@ fn cascade_error_with_default_values(
         _ => None,
     };
 
-    let on_update = match relation.referencing_field().attributes().on_update {
+    let on_update = match relation.referencing_field().explicit_on_update() {
         None if relation.on_update().triggers_modification() => Some(relation.on_update()),
         _ => None,
     };
@@ -471,11 +495,7 @@ pub(super) fn referencing_scalar_field_types(relation: InlineRelationWalker<'_, 
     };
 
     for (referencing, referenced) in referencing_fields.zip(relation.referenced_fields()) {
-        if !field_types_match(
-            referencing.scalar_field.r#type,
-            referenced.scalar_field.r#type,
-            relation.db(),
-        ) {
+        if !field_types_match(referencing.scalar_field_type(), referenced.scalar_field_type(), ctx.db) {
             ctx.push_error(DatamodelError::new_attribute_validation_error(
                 &format!(
                     "The type of the field `{}` in the model `{}` is not matching the type of the referenced field `{}` in model `{}`.",
@@ -509,9 +529,9 @@ pub(super) fn referencing_scalar_field_types(relation: InlineRelationWalker<'_, 
     }
 }
 
-fn is_empty_fields(fields: Option<&[ast::FieldId]>) -> bool {
+fn is_empty_fields<T>(fields: Option<impl ExactSizeIterator<Item = T>>) -> bool {
     match fields {
-        None | Some([]) => true,
-        Some(_) => false,
+        None => true,
+        Some(fields) => fields.len() == 0,
     }
 }

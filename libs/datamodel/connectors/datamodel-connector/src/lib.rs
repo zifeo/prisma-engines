@@ -1,17 +1,20 @@
 #![deny(rust_2018_idioms, unsafe_code)]
 
+pub mod constraint_names;
 pub mod helper;
+pub mod walker_ext_traits;
 
 mod empty_connector;
 mod referential_integrity;
 
 pub use diagnostics::connector_error;
 pub use empty_connector::EmptyDatamodelConnector;
+pub use parser_database;
 pub use referential_integrity::ReferentialIntegrity;
 
 use crate::connector_error::{ConnectorError, ConnectorErrorFactory, ErrorKind};
 use dml::{
-    model::Model, native_type_constructor::NativeTypeConstructor, native_type_instance::NativeTypeInstance,
+    native_type_constructor::NativeTypeConstructor, native_type_instance::NativeTypeInstance,
     relation_info::ReferentialAction, scalars::ScalarType,
 };
 use enumflags2::BitFlags;
@@ -85,7 +88,7 @@ pub trait Connector: Send + Sync {
     ) {
     }
 
-    fn validate_model(&self, _: &Model, _: &mut Vec<ConnectorError>) {}
+    fn validate_model(&self, _model: parser_database::walkers::ModelWalker<'_, '_>, _: &mut Vec<ConnectorError>) {}
 
     /// The scopes in which a constraint name should be validated. If empty, doesn't check for name
     /// clashes in the validation phase.
@@ -175,6 +178,10 @@ pub trait Connector: Send + Sync {
 
     fn supports_json(&self) -> bool {
         self.has_capability(ConnectorCapability::Json)
+    }
+
+    fn supports_json_lists(&self) -> bool {
+        self.has_capability(ConnectorCapability::JsonLists)
     }
 
     fn supports_auto_increment(&self) -> bool {
@@ -271,7 +278,9 @@ capabilities!(
     ScalarLists,
     RelationsOverNonUniqueCriteria,
     Enums,
+    EnumArrayPush,
     Json,
+    JsonLists,
     AutoIncrement,
     RelationFieldsInArbitraryOrder,
     CompositeTypes,
@@ -299,6 +308,7 @@ capabilities!(
     JsonFiltering,
     JsonFilteringJsonPath,
     JsonFilteringArrayPath,
+    JsonFilteringAlphanumeric,
     CompoundIds,
     AnyId, // Any (or combination of) uniques and not only id fields can constitute an id for a model.
     QueryRaw,
@@ -323,6 +333,12 @@ impl ConnectorCapabilities {
 
     pub fn contains(&self, capability: ConnectorCapability) -> bool {
         self.capabilities.contains(&capability)
+    }
+
+    pub fn supports_any(&self, capabilities: &[ConnectorCapability]) -> bool {
+        self.capabilities
+            .iter()
+            .any(|connector_capability| capabilities.contains(connector_capability))
     }
 }
 
@@ -377,5 +393,47 @@ impl ConstraintScope {
                 model_name
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_cap_does_not_contain() {
+        let cap = ConnectorCapabilities::empty();
+        assert!(!cap.supports_any(&[ConnectorCapability::JsonFilteringJsonPath]));
+    }
+
+    #[test]
+    fn test_cap_with_others_does_not_contain() {
+        let cap = ConnectorCapabilities::new(vec![
+            ConnectorCapability::PrimaryKeySortOrderDefinition,
+            ConnectorCapability::JsonFilteringArrayPath,
+        ]);
+        assert!(!cap.supports_any(&[ConnectorCapability::JsonFilteringJsonPath]));
+    }
+
+    #[test]
+    fn test_cap_with_others_does_contain() {
+        let cap = ConnectorCapabilities::new(vec![
+            ConnectorCapability::PrimaryKeySortOrderDefinition,
+            ConnectorCapability::JsonFilteringJsonPath,
+            ConnectorCapability::JsonFilteringArrayPath,
+        ]);
+        assert!(cap.supports_any(&[
+            ConnectorCapability::JsonFilteringJsonPath,
+            ConnectorCapability::JsonFilteringArrayPath,
+        ]));
+    }
+
+    #[test]
+    fn test_does_contain() {
+        let cap = ConnectorCapabilities::new(vec![
+            ConnectorCapability::PrimaryKeySortOrderDefinition,
+            ConnectorCapability::JsonFilteringArrayPath,
+        ]);
+        assert!(!cap.supports_any(&[ConnectorCapability::JsonFilteringJsonPath]));
     }
 }

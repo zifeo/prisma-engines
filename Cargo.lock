@@ -958,9 +958,9 @@ dependencies = [
  "mongodb-datamodel-connector",
  "native-types",
  "once_cell",
+ "parser-database",
  "pest",
  "pretty_assertions",
- "prisma-value",
  "regex",
  "schema-ast",
  "serde",
@@ -975,6 +975,7 @@ dependencies = [
  "diagnostics",
  "dml",
  "enumflags2",
+ "parser-database",
  "serde_json",
  "url",
 ]
@@ -1471,9 +1472,9 @@ checksum = "0e4075386626662786ddb0ec9081e7c7eeb1ba31951f447ca780ef9f5d568189"
 
 [[package]]
 name = "gloo-timers"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47204a46aaff920a1ea58b11d03dec6f704287d27561724a4631e450654a891f"
+checksum = "6f16c88aa13d2656ef20d1c042086b8767bbe2bdb62526894275a1b062161b2e"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -2497,9 +2498,9 @@ dependencies = [
 
 [[package]]
 name = "napi"
-version = "1.7.11"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fd38e4945570d1fdc3052343410a5963c843e5797767009fabcd97dbe429bab"
+checksum = "a5586ff59e18f42d41f68139a8ca72ef1dbcc243ec62c5696e6383169a8a05a4"
 dependencies = [
  "napi-sys",
  "once_cell",
@@ -2511,9 +2512,9 @@ dependencies = [
 
 [[package]]
 name = "napi-build"
-version = "1.1.2"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d46af3cd13ef452354c8704da88bfc4bfa38724ddb38963a5113099749710788"
+checksum = "d9584cc599cffd833a65527fb655bb65180f6ec8f26fba3081d2d989faa03bef"
 
 [[package]]
 name = "napi-derive"
@@ -2826,6 +2827,17 @@ dependencies = [
  "nom",
  "percent-encoding",
  "thiserror",
+]
+
+[[package]]
+name = "parser-database"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "chrono",
+ "diagnostics",
+ "dml",
+ "schema-ast",
 ]
 
 [[package]]

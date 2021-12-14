@@ -32,6 +32,7 @@ pub(super) fn validate(ctx: &mut Context<'_>, relation_transformation_enabled: b
         models::primary_key_length_prefix_supported(model, ctx);
         models::primary_key_sort_order_supported(model, ctx);
         models::only_one_fulltext_attribute_allowed(model, ctx);
+        models::connector_specific(model, ctx);
         autoincrement::validate_auto_increment(model, ctx);
 
         if let Some(pk) = model.primary_key() {
@@ -109,16 +110,16 @@ pub(super) fn validate(ctx: &mut Context<'_>, relation_transformation_enabled: b
             // 1:1, 1:n
             RefinedRelationWalker::Inline(relation) => {
                 if let Some(relation) = relation.as_complete() {
-                    relations::field_arity(relation, ctx);
                     relations::same_length_in_referencing_and_referenced(relation, ctx);
                     relations::cycles(relation, ctx);
                     relations::multiple_cascading_paths(relation, ctx);
-                    relations::has_a_unique_constraint_name(&names, relation, ctx);
                     relations::references_unique_fields(relation, ctx);
                     relations::referencing_fields_in_correct_order(relation, ctx);
                 }
 
+                relations::field_arity(relation, ctx);
                 relations::referencing_scalar_field_types(relation, ctx);
+                relations::has_a_unique_constraint_name(&names, relation, ctx);
 
                 // Only run these when you are not formatting the data model. These validations
                 // test against broken relations that we could fix with a code action. The flag is

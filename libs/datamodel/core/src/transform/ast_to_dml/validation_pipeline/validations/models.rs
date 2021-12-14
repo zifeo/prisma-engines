@@ -2,9 +2,12 @@ use super::database_name::validate_db_name;
 use crate::{
     common::preview_features::PreviewFeature,
     diagnostics::DatamodelError,
-    transform::ast_to_dml::{db::walkers::ModelWalker, validation_pipeline::context::Context},
+    transform::ast_to_dml::{
+        db::walkers::{ModelWalker, PrimaryKeyWalker},
+        validation_pipeline::context::Context,
+    },
 };
-use datamodel_connector::ConnectorCapability;
+use datamodel_connector::{walker_ext_traits::*, ConnectorCapability};
 use itertools::Itertools;
 use std::borrow::Cow;
 
@@ -59,7 +62,7 @@ pub(super) fn has_a_unique_primary_key_name(
     names: &super::Names<'_>,
     ctx: &mut Context<'_>,
 ) {
-    let (pk, name) = match model
+    let (pk, name): (PrimaryKeyWalker<'_, '_>, Cow<'_, str>) = match model
         .primary_key()
         .and_then(|pk| pk.final_database_name(ctx.connector).map(|name| (pk, name)))
     {
@@ -102,12 +105,10 @@ pub(crate) fn uses_sort_or_length_on_primary_without_preview_flag(model: ModelWa
 
     if let Some(pk) = model.primary_key() {
         if pk
-            .attribute
-            .fields
-            .iter()
-            .any(|f| f.sort_order.is_some() || f.length.is_some())
+            .scalar_field_attributes()
+            .any(|f| f.sort_order().is_some() || f.length().is_some())
         {
-            let message = "The sort and length args are not yet available";
+            let message = "You must enable `extendedIndexes` preview feature to use sort or length parameters.";
             let span = pk.ast_attribute().span;
 
             ctx.push_error(DatamodelError::new_attribute_validation_error(message, "id", span));
@@ -117,6 +118,10 @@ pub(crate) fn uses_sort_or_length_on_primary_without_preview_flag(model: ModelWa
 
 /// The database must support the primary key length prefix for it to be allowed in the data model.
 pub(crate) fn primary_key_length_prefix_supported(model: ModelWalker<'_, '_>, ctx: &mut Context<'_>) {
+    if !ctx.preview_features.contains(PreviewFeature::ExtendedIndexes) {
+        return;
+    }
+
     if ctx
         .connector
         .has_capability(ConnectorCapability::IndexColumnLengthPrefixing)
@@ -136,6 +141,10 @@ pub(crate) fn primary_key_length_prefix_supported(model: ModelWalker<'_, '_>, ct
 
 /// Not every database is allowing sort definition in the primary key.
 pub(crate) fn primary_key_sort_order_supported(model: ModelWalker<'_, '_>, ctx: &mut Context<'_>) {
+    if !ctx.preview_features.contains(PreviewFeature::ExtendedIndexes) {
+        return;
+    }
+
     if ctx
         .connector
         .has_capability(ConnectorCapability::PrimaryKeySortOrderDefinition)
@@ -194,7 +203,7 @@ pub(crate) fn primary_key_connector_specific(model: ModelWalker<'_, '_>, ctx: &m
         return;
     };
 
-    if primary_key.db_name().is_some() && !ctx.connector.supports_named_primary_keys() {
+    if primary_key.mapped_name().is_some() && !ctx.connector.supports_named_primary_keys() {
         ctx.push_error(DatamodelError::new_model_validation_error(
             "You defined a database name for the primary key on the model. This is not supported by the provider.",
             model.name(),
@@ -207,6 +216,18 @@ pub(crate) fn primary_key_connector_specific(model: ModelWalker<'_, '_>, ctx: &m
             "The current connector does not support compound ids.",
             model.name(),
             primary_key.ast_attribute().span,
+        ));
+    }
+}
+
+pub(super) fn connector_specific(model: ModelWalker<'_, '_>, ctx: &mut Context<'_>) {
+    let mut errors = Vec::new();
+    ctx.connector.validate_model(model, &mut errors);
+
+    for error in errors {
+        ctx.push_error(DatamodelError::new_connector_error(
+            &error.to_string(),
+            model.ast_model().span,
         ));
     }
 }
