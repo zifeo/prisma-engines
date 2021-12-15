@@ -20,6 +20,10 @@ use tracing::Level;
 use tracing_futures::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+use hyper::header::CONTENT_TYPE;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, HeaderMap, Method, Request, Response, Server, StatusCode};
+
 //// Shared application state.
 pub(crate) struct State {
     cx: Arc<PrismaContext>,
@@ -46,6 +50,46 @@ impl Clone for State {
             enable_debug_mode: self.enable_debug_mode,
         }
     }
+}
+
+#[tracing::instrument(skip(opts))]
+pub async fn listen_hyper(opts: PrismaOpt) -> PrismaResult<()> {
+    let config = opts.configuration(false)?.subject;
+    config.validate_that_one_datasource_is_provided()?;
+
+    let enable_itx = config
+        .preview_features()
+        .contains(PreviewFeature::InteractiveTransactions);
+
+    let datamodel = opts.datamodel()?;
+    let cx = PrismaContext::builder(config, datamodel)
+        .legacy(opts.legacy)
+        .enable_raw_queries(opts.enable_raw_queries)
+        .build()
+        .await?;
+
+    let state = State::new(cx, opts.enable_playground, opts.enable_debug_mode);
+
+    let query_engine = make_service_fn(move |_| {
+        let state = state.clone();
+        async move { Ok::<_, hyper::Error>(service_fn(move |req| routes(state.clone(), req))) }
+    });
+
+    let ip = opts.host.parse().expect("Host was not a valid IP address.");
+    let addr = SocketAddr::new(ip, opts.port);
+
+    let server = Server::bind(&addr);
+    info!("Started http server on {}", addr);
+
+    let server = Server::bind(&addr).serve(query_engine);
+
+    println!("Listening on http://{}", addr);
+
+    if let Err(e) = server.await {
+        eprintln!("server error: {}", e);
+    }
+
+    Ok(())
 }
 
 /// Create a new server and listen.
@@ -96,6 +140,64 @@ pub async fn listen(opts: PrismaOpt) -> PrismaResult<()> {
     info!("Started http server on {}", listener);
     listener.accept().await?;
     Ok(())
+}
+
+async fn routes(state: State, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
+    let start = Instant::now();
+
+    let mut res = match (req.method(), req.uri().path()) {
+        // (&Method::POST, "/") => graphql_handler(state, req).await?,
+        (&Method::GET, "/") if state.enable_playground => playground_handler(),
+
+        // (&Method::GET, "/status") => Response::builder()
+        //     .status(StatusCode::OK)
+        //     .header(CONTENT_TYPE, "application/json")
+        //     .body(Body::from(r#"{"status":"ok"}"#))
+        //     .unwrap(),
+
+        // (&Method::GET, "/sdl") => {
+        //     let schema = GraphQLSchemaRenderer::render(state.cx.query_schema().clone());
+
+        //     Response::builder()
+        //         .status(StatusCode::OK)
+        //         .header(CONTENT_TYPE, "application/text")
+        //         .body(Body::from(schema))
+        //         .unwrap()
+        // }
+
+        // (&Method::GET, "/dmmf") => {
+        //     let schema = dmmf::render_dmmf(state.cx.datamodel(), Arc::clone(state.cx.query_schema()));
+
+        //     Response::builder()
+        //         .status(StatusCode::OK)
+        //         .header(CONTENT_TYPE, "application/json")
+        //         .body(Body::from(serde_json::to_vec(&schema).unwrap()))
+        //         .unwrap()
+        // }
+
+        // (&Method::GET, "/server_info") => {
+        //     let body = serde_json::json!({
+        //         "commit": env!("GIT_HASH"),
+        //         "version": env!("CARGO_PKG_VERSION"),
+        //         "primary_connector": state.cx.primary_connector(),
+        //     });
+
+        //     Response::builder()
+        //         .status(StatusCode::OK)
+        //         .header(CONTENT_TYPE, "application/json")
+        //         .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        //         .unwrap()
+        // }
+        _ => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::empty())
+            .unwrap(),
+    };
+
+    let elapsed = Instant::now().duration_since(start).as_micros() as u64;
+    res.headers_mut().insert("x-elapsed", elapsed.into());
+
+    Ok(res)
 }
 
 /// The main query handler. This handles incoming GraphQL queries and passes it

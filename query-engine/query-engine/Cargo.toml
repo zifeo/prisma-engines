@@ -38,7 +38,7 @@ thiserror = "1.0"
 tide = { version = "0.15.0", default-features = false, features = ["h1-server", "logger"] }
 tide-server-timing = "0.15.0"
 url = "2.1"
-
+hyper = { version = "0.14", features = ["server", "http1", "http2", "runtime"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.16"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
