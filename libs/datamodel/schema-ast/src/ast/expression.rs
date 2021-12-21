@@ -6,12 +6,10 @@ use std::fmt;
 pub enum Expression {
     /// Any numeric value e.g. floats or ints.
     NumericValue(String, Span),
-    /// Any boolean value.
-    BooleanValue(String, Span),
     /// Any string value.
     StringValue(String, Span),
     /// Any literal constant, basically a string which was not inside "...".
-    /// This is used for representing builtin enums.
+    /// This is used for representing builtin enums and boolean constants (true and false).
     ConstantValue(String, Span),
     /// A function with a name and arguments, which is evaluated at client side.
     Function(String, Vec<Expression>, Span),
@@ -24,10 +22,9 @@ pub enum Expression {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::NumericValue(val, _) => write!(f, "{}", val),
-            Expression::BooleanValue(val, _) => write!(f, "{}", val),
+            Expression::NumericValue(val, _) => fmt::Display::fmt(val, f),
             Expression::StringValue(val, _) => write!(f, "\"{}\"", val),
-            Expression::ConstantValue(val, _) => write!(f, "{}", val),
+            Expression::ConstantValue(val, _) => fmt::Display::fmt(val, f),
             Expression::Function(fun, args, _) => {
                 let args = args.iter().map(ToString::to_string).collect::<Vec<_>>().join(",");
                 write!(f, "{}({})", fun, args)
@@ -52,9 +49,16 @@ impl Expression {
         }
     }
 
-    pub fn extract_constant_value(&self) -> Option<(&str, Span)> {
+    pub fn as_constant_value(&self) -> Option<(&str, Span)> {
         match self {
             Expression::ConstantValue(s, span) => Some((s, *span)),
+            _ => None,
+        }
+    }
+
+    pub fn as_numeric_value(&self) -> Option<(&str, Span)> {
+        match self {
+            Expression::NumericValue(s, span) => Some((s, *span)),
             _ => None,
         }
     }
@@ -62,7 +66,6 @@ impl Expression {
     pub fn span(&self) -> Span {
         match &self {
             Self::NumericValue(_, span) => *span,
-            Self::BooleanValue(_, span) => *span,
             Self::StringValue(_, span) => *span,
             Self::ConstantValue(_, span) => *span,
             Self::Function(_, _, span) => *span,
@@ -82,7 +85,6 @@ impl Expression {
     pub fn describe_value_type(&self) -> &'static str {
         match self {
             Expression::NumericValue(_, _) => "numeric",
-            Expression::BooleanValue(_, _) => "boolean",
             Expression::StringValue(_, _) => "string",
             Expression::ConstantValue(_, _) => "literal",
             Expression::Function(_, _, _) => "functional",

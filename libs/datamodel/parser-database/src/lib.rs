@@ -4,7 +4,7 @@
 //!
 //! ## Scope
 //!
-//! The ParserDatbase is tasked with gathering information about the schema. It is _connector
+//! The ParserDatabase is tasked with gathering information about the schema. It is _connector
 //! agnostic_: it gathers information and performs generic validations, leaving connector-specific
 //! validations to later phases in datamodel core.
 //!
@@ -33,6 +33,7 @@ mod types;
 mod value_validator;
 
 pub use names::is_reserved_type_name;
+pub use relations::ReferentialAction;
 pub use schema_ast::ast;
 pub use types::{IndexAlgorithm, IndexType, ScalarFieldType, ScalarType, SortOrder};
 pub use value_validator::{ValueListValidator, ValueValidator};
@@ -130,5 +131,11 @@ impl<'ast> ParserDatabase<'ast> {
     /// Find a specific field in a specific model.
     fn find_model_field(&self, model_id: ast::ModelId, field_name: &str) -> Option<ast::FieldId> {
         self.names.model_fields.get(&(model_id, field_name)).cloned()
+    }
+}
+
+impl std::fmt::Debug for ParserDatabase<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ParserDatabase { ... }")
     }
 }

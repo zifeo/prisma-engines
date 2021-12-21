@@ -2,9 +2,8 @@ use crate::{
     ast::{self, FieldArity},
     types::RelationField,
     walkers::{ModelWalker, ScalarFieldWalker},
-    ParserDatabase,
+    ParserDatabase, ReferentialAction,
 };
-use dml::relation_info::ReferentialAction;
 use std::{
     borrow::Cow,
     fmt,
@@ -12,7 +11,7 @@ use std::{
 };
 
 /// A relation field on a model in the schema.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct RelationFieldWalker<'ast, 'db> {
     pub(crate) model_id: ast::ModelId,
     pub(crate) field_id: ast::FieldId,
@@ -78,6 +77,11 @@ impl<'ast, 'db> RelationFieldWalker<'ast, 'db> {
     /// Is there an `@ignore` attribute on the field?
     pub fn is_ignored(self) -> bool {
         self.relation_field.is_ignored
+    }
+
+    /// Is the field required? (not optional, not list)
+    pub fn is_required(self) -> bool {
+        self.ast_field().arity.is_required()
     }
 
     /// The model containing the field.

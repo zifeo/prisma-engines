@@ -28,6 +28,7 @@ pub(super) fn validate(ctx: &mut Context<'_>, relation_transformation_enabled: b
         models::has_a_strict_unique_criteria(model, ctx);
         models::has_a_unique_primary_key_name(model, &names, ctx);
         models::uses_sort_or_length_on_primary_without_preview_flag(model, ctx);
+        models::id_has_fields(model, ctx);
         models::primary_key_connector_specific(model, ctx);
         models::primary_key_length_prefix_supported(model, ctx);
         models::primary_key_sort_order_supported(model, ctx);
@@ -68,6 +69,7 @@ pub(super) fn validate(ctx: &mut Context<'_>, relation_transformation_enabled: b
         }
 
         for index in model.indexes() {
+            indexes::has_fields(index, ctx);
             indexes::has_a_unique_constraint_name(index, &names, ctx);
             indexes::uses_length_or_sort_without_preview_flag(index, ctx);
             indexes::field_length_prefix_supported(index, ctx);
@@ -110,13 +112,13 @@ pub(super) fn validate(ctx: &mut Context<'_>, relation_transformation_enabled: b
             // 1:1, 1:n
             RefinedRelationWalker::Inline(relation) => {
                 if let Some(relation) = relation.as_complete() {
-                    relations::same_length_in_referencing_and_referenced(relation, ctx);
                     relations::cycles(relation, ctx);
                     relations::multiple_cascading_paths(relation, ctx);
-                    relations::references_unique_fields(relation, ctx);
-                    relations::referencing_fields_in_correct_order(relation, ctx);
                 }
 
+                relations::references_unique_fields(relation, ctx);
+                relations::same_length_in_referencing_and_referenced(relation, ctx);
+                relations::referencing_fields_in_correct_order(relation, ctx);
                 relations::field_arity(relation, ctx);
                 relations::referencing_scalar_field_types(relation, ctx);
                 relations::has_a_unique_constraint_name(&names, relation, ctx);
@@ -134,6 +136,7 @@ pub(super) fn validate(ctx: &mut Context<'_>, relation_transformation_enabled: b
                         // Run these validations last to prevent validation spam.
                         relations::one_to_one::fields_references_mixups(relation, ctx);
                         relations::one_to_one::back_relation_arity_is_optional(relation, ctx);
+                        relations::one_to_one::fields_and_references_on_wrong_side(relation, ctx);
                     } else {
                         relations::one_to_many::both_sides_are_defined(relation, ctx);
                         relations::one_to_many::fields_and_references_are_defined(relation, ctx);

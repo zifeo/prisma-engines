@@ -84,8 +84,11 @@ mod transform;
 
 pub use crate::dml::*;
 pub use configuration::{Configuration, Datasource, Generator, StringFromEnvVar};
+pub use datamodel_connector;
 pub use diagnostics;
+pub use parser_database;
 pub use parser_database::is_reserved_type_name;
+pub use schema_ast;
 
 use crate::{ast::SchemaAst, common::preview_features::PreviewFeature};
 use ast::reformat::MissingField;
@@ -146,25 +149,24 @@ fn parse_datamodel_internal(
 
     diagnostics.to_result()?;
 
-    match validate(&ast, &datasources, preview_features, transform) {
-        Ok(mut src) => {
-            src.warnings.append(diagnostics.warnings_mut());
-            Ok(Validated {
-                subject: (
-                    Configuration {
-                        generators,
-                        datasources,
-                    },
-                    src.subject,
-                ),
-                warnings: src.warnings,
-            })
-        }
-        Err(mut err) => {
-            diagnostics.append(&mut err);
-            Err(diagnostics)
-        }
+    let out = validate(&ast, &datasources, preview_features, diagnostics, transform);
+
+    if !out.diagnostics.errors().is_empty() {
+        return Err(out.diagnostics);
     }
+
+    let datamodel = transform::ast_to_dml::LiftAstToDml::new(&out.db, out.connector, out.referential_integrity).lift();
+
+    Ok(Validated {
+        subject: (
+            Configuration {
+                generators,
+                datasources,
+            },
+            datamodel,
+        ),
+        warnings: out.diagnostics.warnings().to_vec(),
+    })
 }
 
 pub fn parse_schema_ast(datamodel_string: &str) -> Result<SchemaAst, diagnostics::Diagnostics> {

@@ -731,10 +731,12 @@ impl<'a> Reformatter<'a> {
     ) {
         let mut builder = StringBuilder::new();
 
+        debug_assert_eq!(token.as_rule(), Rule::attribute_arguments);
+
         for current in token.clone().into_inner() {
             match current.as_rule() {
                 // This is a named arg.
-                Rule::argument => {
+                Rule::named_argument => {
                     if !builder.line_empty() {
                         builder.write(", ");
                     }
@@ -777,7 +779,6 @@ impl<'a> Reformatter<'a> {
         match val {
             ast::Expression::Array(vals, _) => Self::render_expression_array(target, vals),
             ast::Expression::FieldWithArgs(ident, vals, _) => Self::render_constant_value_w_args(target, ident, vals),
-            ast::Expression::BooleanValue(val, _) => target.write(val),
             ast::Expression::ConstantValue(val, _) => target.write(val),
             ast::Expression::NumericValue(val, _) => target.write(val),
             ast::Expression::StringValue(val, _) => Self::render_str(target, val),
@@ -875,7 +876,6 @@ impl<'a> Reformatter<'a> {
             match current.as_rule() {
                 Rule::numeric_literal => target.write(current.as_str()),
                 Rule::string_literal => target.write(current.as_str()),
-                Rule::boolean_literal => target.write(current.as_str()),
                 Rule::constant_literal => target.write(current.as_str()),
                 Rule::function => Self::reformat_function_expression(target, &current),
                 Rule::array_expression => Self::reformat_array_expression(target, &current),
@@ -912,6 +912,7 @@ impl<'a> Reformatter<'a> {
     }
 
     fn reformat_field_with_args(target: &mut dyn LineWriteable, token: &Token<'_>) {
+        debug_assert_eq!(token.as_rule(), Rule::field_with_args);
         let mut has_seen_one_argument = false;
 
         for current in token.clone().into_inner() {
@@ -920,7 +921,7 @@ impl<'a> Reformatter<'a> {
                     target.write(current.as_str());
                     target.write("(");
                 }
-                Rule::argument => {
+                Rule::named_argument => {
                     if has_seen_one_argument {
                         target.write(", ");
                     }

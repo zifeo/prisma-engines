@@ -1,4 +1,4 @@
-use crate::ast;
+use crate::ast::{self, WithName};
 use crate::ValueValidator;
 use crate::{DatamodelError, Diagnostics};
 use std::collections::HashMap;
@@ -44,6 +44,14 @@ impl<'a> Arguments<'a> {
             ))
         }
 
+        for arg in &attribute.empty_arguments {
+            errors.push_error(DatamodelError::new_attribute_validation_error(
+                &format!("The `{}` argument is missing a value.", arg.name.name),
+                attribute.name(),
+                arg.name.span,
+            ))
+        }
+
         errors.to_result()
     }
 
@@ -65,11 +73,6 @@ impl<'a> Arguments<'a> {
 
     pub(crate) fn optional_arg(&mut self, name: &str) -> Option<ValueValidator<'a>> {
         self.args.remove(name).map(|arg| ValueValidator::new(&arg.value))
-    }
-
-    /// True if argument with the given key is defined.
-    pub(crate) fn has_arg(&self, name: &str) -> bool {
-        self.args.contains_key(name)
     }
 
     /// Gets the arg with the given name, or if it is not found, the first unnamed argument.

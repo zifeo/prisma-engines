@@ -5,22 +5,22 @@ pub mod helper;
 pub mod walker_ext_traits;
 
 mod empty_connector;
+mod native_type_constructor;
 mod referential_integrity;
 
 pub use diagnostics::connector_error;
 pub use empty_connector::EmptyDatamodelConnector;
-pub use parser_database;
+pub use native_type_constructor::NativeTypeConstructor;
+pub use parser_database::{self, ReferentialAction, ScalarType};
 pub use referential_integrity::ReferentialIntegrity;
 
 use crate::connector_error::{ConnectorError, ConnectorErrorFactory, ErrorKind};
-use dml::{
-    native_type_constructor::NativeTypeConstructor, native_type_instance::NativeTypeInstance,
-    relation_info::ReferentialAction, scalars::ScalarType,
-};
+use dml::native_type_instance::NativeTypeInstance;
 use enumflags2::BitFlags;
 use std::{borrow::Cow, collections::BTreeMap, str::FromStr};
 
 pub trait Connector: Send + Sync {
+    /// The name of the connector. Can be used in error messages.
     fn name(&self) -> &str;
 
     fn capabilities(&self) -> &'static [ConnectorCapability];
@@ -74,7 +74,7 @@ pub trait Connector: Send + Sync {
         &self,
         _field_name: &str,
         _scalar_type: &ScalarType,
-        _default: Option<&dml::default_value::DefaultValue>,
+        _default: Option<&dml::default_value::DefaultKind>,
         _errors: &mut Vec<ConnectorError>,
     ) {
     }
@@ -393,6 +393,22 @@ impl ConstraintScope {
                 model_name
             )),
         }
+    }
+}
+
+/// (temporary) bridge between dml::scalars::ScalarType and parser_database::ScalarType. Avoid
+/// relying on this if you can.
+pub fn convert_from_scalar_type(st: dml::scalars::ScalarType) -> ScalarType {
+    match st {
+        dml::scalars::ScalarType::Int => ScalarType::Int,
+        dml::scalars::ScalarType::BigInt => ScalarType::BigInt,
+        dml::scalars::ScalarType::Float => ScalarType::Float,
+        dml::scalars::ScalarType::Boolean => ScalarType::Boolean,
+        dml::scalars::ScalarType::String => ScalarType::String,
+        dml::scalars::ScalarType::DateTime => ScalarType::DateTime,
+        dml::scalars::ScalarType::Json => ScalarType::Json,
+        dml::scalars::ScalarType::Bytes => ScalarType::Bytes,
+        dml::scalars::ScalarType::Decimal => ScalarType::Decimal,
     }
 }
 

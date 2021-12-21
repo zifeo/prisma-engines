@@ -1,12 +1,10 @@
 use datamodel_connector::{
     connector_error::ConnectorError,
     helper::{arg_vec_from_opt, args_vec_from_opt, parse_one_opt_u32, parse_two_opt_u32},
-    parser_database, Connector, ConnectorCapability, ConstraintScope, ReferentialIntegrity,
+    parser_database, Connector, ConnectorCapability, ConstraintScope, NativeTypeConstructor, ReferentialAction,
+    ReferentialIntegrity, ScalarType,
 };
-use dml::{
-    native_type_constructor::NativeTypeConstructor, native_type_instance::NativeTypeInstance,
-    relation_info::ReferentialAction, scalars::ScalarType,
-};
+use dml::native_type_instance::NativeTypeInstance;
 use enumflags2::BitFlags;
 use native_types::CockroachType::{self, *};
 
@@ -104,7 +102,7 @@ pub struct CockroachDatamodelConnector;
 
 impl Connector for CockroachDatamodelConnector {
     fn name(&self) -> &str {
-        "Cockroach"
+        "CockroachDB"
     }
 
     fn capabilities(&self) -> &'static [ConnectorCapability] {

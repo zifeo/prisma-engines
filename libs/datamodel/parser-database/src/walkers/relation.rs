@@ -1,9 +1,4 @@
-use super::{ModelWalker, RelationFieldWalker, RelationName, ScalarFieldWalker};
-use crate::{
-    ast,
-    {relations::*, ParserDatabase, ScalarFieldType},
-};
-use dml::relation_info::ReferentialAction;
+use crate::{ast, relations::*, walkers::*, ParserDatabase, ScalarFieldType};
 
 /// A relation that has the minimal amount of information for us to create one. Useful for
 /// validation purposes. Holds all possible relation types.
@@ -54,7 +49,7 @@ impl<'ast, 'db> RefinedRelationWalker<'ast, 'db> {
     }
 }
 
-/// A scalar inferred by loose/magic reformatting
+/// A scalar inferred by loose/magic reformatting.
 #[allow(missing_docs)]
 pub struct InferredField<'ast, 'db> {
     pub name: String,
@@ -63,7 +58,7 @@ pub struct InferredField<'ast, 'db> {
     pub blueprint: ScalarFieldWalker<'ast, 'db>,
 }
 
-/// The scalar fields on the concrete side relation.
+/// The scalar fields on the concrete side of the relation.
 pub enum ReferencingFields<'ast, 'db> {
     /// Existing scalar fields
     Concrete(Box<dyn ExactSizeIterator<Item = ScalarFieldWalker<'ast, 'db>> + 'db>),

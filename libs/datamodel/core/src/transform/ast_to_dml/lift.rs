@@ -73,13 +73,18 @@ impl<'a> LiftAstToDml<'a> {
         let referential_integrity = self.referential_integrity;
         let common_dml_fields = |field: &mut dml::RelationField, relation_field: RelationFieldWalker<'_, '_>| {
             let ast_field = relation_field.ast_field();
-            field.relation_info.on_delete = relation_field.explicit_on_delete();
-            field.relation_info.on_update = relation_field.explicit_on_update();
+            field.relation_info.on_delete = relation_field
+                .explicit_on_delete()
+                .map(parser_database_referential_action_to_dml_referential_action);
+            field.relation_info.on_update = relation_field
+                .explicit_on_update()
+                .map(parser_database_referential_action_to_dml_referential_action);
             field.relation_info.name = relation_field.relation_name().to_string();
             field.documentation = ast_field.documentation.clone().map(|comment| comment.text);
             field.is_ignored = relation_field.is_ignored();
             field.supports_restrict_action(
-                active_connector.supports_referential_action(&referential_integrity, dml::ReferentialAction::Restrict),
+                active_connector
+                    .supports_referential_action(&referential_integrity, parser_database::ReferentialAction::Restrict),
             );
             field.emulates_referential_actions(referential_integrity.is_prisma());
         };
@@ -352,7 +357,7 @@ impl<'a> LiftAstToDml<'a> {
             field.is_updated_at = scalar_field.is_updated_at();
             field.database_name = scalar_field.mapped_name().map(String::from);
             field.default_value = scalar_field.default_value().map(|d| dml::DefaultValue {
-                kind: d.default().kind().clone(),
+                kind: d.dml_default_kind(),
                 db_name: Some(d.constraint_name(self.connector).into())
                     .filter(|_| self.connector.supports_named_default_values()),
             });
@@ -420,7 +425,11 @@ impl<'a> LiftAstToDml<'a> {
                 let native_type = scalar_field
                     .raw_native_type()
                     .map(|(_, name, args, _)| self.connector.parse_native_type(name, args.to_owned()).unwrap());
-                dml::FieldType::Scalar(scalar_type.to_owned(), None, native_type)
+                dml::FieldType::Scalar(
+                    parser_database_scalar_type_to_dml_scalar_type(*scalar_type),
+                    None,
+                    native_type,
+                )
             }
         }
     }
@@ -431,7 +440,7 @@ impl<'a> LiftAstToDml<'a> {
                 CompositeTypeFieldType::CompositeType(self.db.ast()[*ctid].name.name.to_owned())
             }
             db::ScalarFieldType::BuiltInScalar(scalar_type) => {
-                CompositeTypeFieldType::Scalar(scalar_type.to_owned(), None, None)
+                CompositeTypeFieldType::Scalar(parser_database_scalar_type_to_dml_scalar_type(*scalar_type), None, None)
             }
             db::ScalarFieldType::Alias(_) | db::ScalarFieldType::Enum(_) | db::ScalarFieldType::Unsupported => {
                 unreachable!()
@@ -445,4 +454,20 @@ fn parser_database_sort_order_to_dml_sort_order(sort_order: parser_database::Sor
         parser_database::SortOrder::Asc => dml::SortOrder::Asc,
         parser_database::SortOrder::Desc => dml::SortOrder::Desc,
     }
+}
+
+fn parser_database_referential_action_to_dml_referential_action(
+    ra: parser_database::ReferentialAction,
+) -> dml::ReferentialAction {
+    match ra {
+        parser_database::ReferentialAction::Cascade => dml::ReferentialAction::Cascade,
+        parser_database::ReferentialAction::SetNull => dml::ReferentialAction::SetNull,
+        parser_database::ReferentialAction::SetDefault => dml::ReferentialAction::SetDefault,
+        parser_database::ReferentialAction::Restrict => dml::ReferentialAction::Restrict,
+        parser_database::ReferentialAction::NoAction => dml::ReferentialAction::NoAction,
+    }
+}
+
+fn parser_database_scalar_type_to_dml_scalar_type(st: parser_database::ScalarType) -> dml::ScalarType {
+    st.as_str().parse().unwrap()
 }

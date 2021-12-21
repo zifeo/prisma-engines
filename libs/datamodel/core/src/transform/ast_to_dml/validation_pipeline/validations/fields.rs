@@ -9,7 +9,7 @@ use crate::{
     transform::ast_to_dml::{
         db::{
             walkers::{FieldWalker, ScalarFieldAttributeWalker, ScalarFieldWalker},
-            ScalarFieldType,
+            ScalarFieldType, ScalarType,
         },
         validation_pipeline::context::Context,
     },
@@ -19,8 +19,7 @@ use datamodel_connector::{
     walker_ext_traits::*,
     ConnectorCapability,
 };
-use dml::scalars::ScalarType;
-use itertools::Itertools;
+use std::str::FromStr;
 
 pub(super) fn validate_client_name(field: FieldWalker<'_, '_>, names: &Names<'_>, ctx: &mut Context<'_>) {
     let model = field.model();
@@ -196,8 +195,13 @@ pub(super) fn validate_native_type_arguments(field: ScalarFieldWalker<'_, '_>, c
         ctx.push_error(DatamodelError::new_connector_error(
             &ConnectorError::from_kind(ErrorKind::IncompatibleNativeType {
                 native_type: type_name.to_owned(),
-                field_type: scalar_type.to_string(),
-                expected_types: constructor.prisma_types.iter().map(|s| s.to_string()).join(" or "),
+                field_type: scalar_type.as_str(),
+                expected_types: constructor
+                    .prisma_types
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" or "),
             })
             .to_string(),
             span,
@@ -225,12 +229,13 @@ pub(super) fn validate_native_type_arguments(field: ScalarFieldWalker<'_, '_>, c
 }
 
 pub(super) fn validate_default(field: ScalarFieldWalker<'_, '_>, ctx: &mut Context<'_>) {
+    use chrono::{DateTime, FixedOffset};
+
     // Named defaults.
 
-    let default = field.default_value().map(|d| d.default());
-    let has_db_name = default.map(|d| d.db_name().is_some()).unwrap_or_default();
+    let mapped_name = field.default_value().and_then(|default| default.mapped_name());
 
-    if has_db_name && !ctx.connector.supports_named_default_values() {
+    if mapped_name.is_some() && !ctx.connector.supports_named_default_values() {
         ctx.push_error(DatamodelError::new_attribute_validation_error(
             "You defined a database name for the default value of a field on the model. This is not supported by the provider.",
             "default",
@@ -238,17 +243,15 @@ pub(super) fn validate_default(field: ScalarFieldWalker<'_, '_>, ctx: &mut Conte
         ));
     }
 
-    if has_db_name {
+    if mapped_name.is_some() {
         validate_db_name(
             field.model().name(),
             field.default_attribute().unwrap(),
-            default.and_then(|d| d.db_name()),
+            mapped_name,
             ctx,
             false,
         );
     }
-
-    // Connector-specific validations.
 
     let scalar_type = if let Some(scalar_type) = field.scalar_type() {
         scalar_type
@@ -256,10 +259,83 @@ pub(super) fn validate_default(field: ScalarFieldWalker<'_, '_>, ctx: &mut Conte
         return;
     };
 
+    // Scalar type specific validations.
+    match (scalar_type, field.default_value()) {
+        (ScalarType::Json, Some(attribute)) => {
+            if let Some((value, span)) = attribute.value().as_string_value() {
+                if let Err(details) = serde_json::from_str::<serde_json::Value>(value) {
+                    return ctx.push_error(DatamodelError::new_attribute_validation_error(
+                        &format!(
+                            "Parse error: \"{bad_value}\" is not a valid JSON string. ({details})",
+                            details = details,
+                            bad_value = value,
+                        ),
+                        "default",
+                        span,
+                    ));
+                }
+            }
+        }
+        (ScalarType::Bytes, Some(attribute)) => {
+            if let Some((value, span)) = attribute.value().as_string_value() {
+                if let Err(details) = dml::prisma_value::decode_bytes(value) {
+                    return ctx.push_error(DatamodelError::new_attribute_validation_error(
+                        &format!(
+                            "Parse error: \"{bad_value}\" is not a valid base64 string. ({details})",
+                            details = details,
+                            bad_value = value,
+                        ),
+                        "default",
+                        span,
+                    ));
+                }
+            }
+        }
+        (ScalarType::DateTime, Some(attribute)) => {
+            if let Some((value, span)) = attribute.value().as_string_value() {
+                if let Err(details) = DateTime::<FixedOffset>::parse_from_rfc3339(value) {
+                    return ctx.push_error(DatamodelError::new_attribute_validation_error(
+                        &format!(
+                            "Parse error: \"{bad_value}\" is not a valid rfc3339 datetime string. ({details})",
+                            details = details,
+                            bad_value = value,
+                        ),
+                        "default",
+                        span,
+                    ));
+                }
+            }
+        }
+        (ScalarType::BigInt | ScalarType::Int, Some(attribute)) => {
+            if let Some((value, span)) = attribute.value().as_numeric_value() {
+                if let Err(details) = i64::from_str(value) {
+                    return ctx.push_error(DatamodelError::new_attribute_validation_error(
+                        &format!(
+                            "Parse error: \"{bad_value}\" is not a valid integer. ({details})",
+                            details = details,
+                            bad_value = value,
+                        ),
+                        "default",
+                        span,
+                    ));
+                }
+            }
+        }
+        _ => (),
+    }
+
+    // Connector-specific validations.
+
     let mut errors = Vec::new();
+    let default = field.default_value().map(|d| d.dml_default_kind());
+
     if field.raw_native_type().is_none() {
-        ctx.connector
-            .validate_field_default_without_native_type(field.name(), &scalar_type, default, &mut errors);
+        ctx.connector.validate_field_default_without_native_type(
+            field.name(),
+            &scalar_type,
+            default.as_ref(),
+            &mut errors,
+        );
     }
 
     for error in errors {
@@ -271,14 +347,17 @@ pub(super) fn validate_default(field: ScalarFieldWalker<'_, '_>, ctx: &mut Conte
 }
 
 pub(super) fn validate_scalar_field_connector_specific(field: ScalarFieldWalker<'_, '_>, ctx: &mut Context<'_>) {
-    if matches!(field.scalar_field_type(), ScalarFieldType::BuiltInScalar(t) if t.is_json()) {
+    if matches!(
+        field.scalar_field_type(),
+        ScalarFieldType::BuiltInScalar(ScalarType::Json)
+    ) {
         if !ctx.connector.supports_json() {
             ctx.push_error(DatamodelError::new_field_validation_error(
                 &format!(
-                    "Field `{}` in model `{}` can't be of type Json. The current connector does not support the Json type.",
-                    field.name(),
-                    field.model().name()
-                ),
+                "Field `{}` in model `{}` can't be of type Json. The current connector does not support the Json type.",
+                field.name(),
+                field.model().name(),
+            ),
                 field.model().name(),
                 field.name(),
                 field.ast_field().span,
@@ -345,7 +424,7 @@ pub(super) fn validate_unsupported_field_type(field: ScalarFieldWalker<'_, '_>, 
 
             let msg = format!(
                         "The type `Unsupported(\"{}\")` you specified in the type definition for the field `{}` is supported as a native type by Prisma. Please use the native type notation `{} @{}.{}` for full support.",
-                        unsupported_lit, field.name(), prisma_type.to_string(), &source.name, native_type.render()
+                        unsupported_lit, field.name(), prisma_type.as_str(), &source.name, native_type.render()
                     );
 
             ctx.push_error(DatamodelError::new_validation_error(msg, field.ast_field().span));
