@@ -10,7 +10,6 @@ use opentelemetry::{global, propagation::Extractor, Context};
 use query_core::{schema::QuerySchemaRenderer, TxId};
 use request_handlers::{dmmf, GraphQLSchemaRenderer, GraphQlHandler, TxInput};
 use serde_json::json;
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
