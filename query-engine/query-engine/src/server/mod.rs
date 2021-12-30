@@ -1,5 +1,3 @@
-#![deny(missing_docs)]
-
 use crate::{context::PrismaContext, opt::PrismaOpt, PrismaResult};
 use datamodel::common::preview_features::PreviewFeature;
 use futures::task::Spawn;
@@ -50,6 +48,7 @@ impl Clone for State {
     }
 }
 
+/// Starts up the graphql query engine server
 #[tracing::instrument(skip(opts))]
 pub async fn listen(opts: PrismaOpt) -> PrismaResult<()> {
     let config = opts.configuration(false)?.subject;

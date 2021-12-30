@@ -160,7 +160,7 @@ impl PrismaOpt {
     }
 
     /// Extract the log format from on the RUST_LOG_FORMAT env var.
-    pub(crate) fn log_format(&self) -> crate::LogFormat {
+    pub fn log_format(&self) -> crate::LogFormat {
         match self.log_format.as_deref() {
             Some("devel") => crate::LogFormat::Text,
             _ => crate::LogFormat::Json,
@@ -168,12 +168,12 @@ impl PrismaOpt {
     }
 
     /// The unix path to listen on.
-    pub(crate) fn unix_path(&self) -> Option<&String> {
+    pub fn unix_path(&self) -> Option<&String> {
         self.unix_path.as_ref()
     }
 
     /// Enable query logging
-    pub(crate) fn log_queries(&self) -> bool {
+    pub fn log_queries(&self) -> bool {
         std::env::var("LOG_QUERIES").map(|_| true).unwrap_or(self.log_queries)
     }
 }
