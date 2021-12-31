@@ -50,33 +50,7 @@ impl RunnerInterface for BinaryRunner {
         let full_body = hyper::body::to_bytes(body_start).await.unwrap();
 
         println!(" BODY {:?}", full_body);
-        // let gql_response: GQLResponse = serde_json::from_slice(full_body.as_ref()).unwrap();
         let json_resp: serde_json::Value = serde_json::from_slice(full_body.as_ref()).unwrap();
-        // let data = &json_resp["data"];
-        // // let obj = data.as_object().unwrap();
-
-        // // let keys: Vec<_> = obj.keys().collect();
-        // // let name = keys[0];
-
-        // // let a = ResponseData::new(name.to_string(), query_core::Item::Json(data.clone()));
-
-        // // let mut a: IndexMap<String, query_core::Item> = IndexMap::with_capacity(0);
-
-        // // obj.iter().for_each(|(k, v)| {
-        // //     a.insert(k.to_string(), query_core::Item::Json(v.clone()));
-        // // });
-
-        // // // let z = ResponseData::from(_)
-        // // println!("HELLO {:?}", data);
-        // // // let mut gql_response = GQLResponse::with_capacity(1);
-        // // let gql_response = GQLResponse {
-        // //     data: a,
-        // //     ..Default::default()
-        // // };
-        // // gql_response.insert_data(name, query_core::Item::Json(serde_json::Value::Object(obj.clone())));
-        // let gql_response: GQLResponse = data.clone().into();
-
-        // let p = PrismaResponse::Single(gql_response.into());
 
         Ok(json_resp.into())
     }

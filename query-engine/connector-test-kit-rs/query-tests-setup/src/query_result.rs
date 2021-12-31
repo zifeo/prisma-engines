@@ -113,8 +113,8 @@ impl QueryResult {
                 Some(msg) => err.message().contains(msg),
                 None => true,
             };
-            println!("CODE {:?}", err.code(), code_matches);
-            println!("msg {:?}", err.message(), msg_matches);
+            println!("CODE {:?} {:?}", err.code(), code_matches);
+            println!("msg {:?} {:?}", err.message(), msg_matches);
 
             code_matches && msg_matches
         });
@@ -144,9 +144,13 @@ impl QueryResult {
                         .iter()
                         .map(|err_val| {
                             let error = err_val.as_object().unwrap();
-                            let code = match error.get("code") {
-                                Some(val) => Some(val.to_string()),
-                                None => None,
+                            let code = if let Some(user_facing_error) = error.get("user_facing_error") {
+                                match user_facing_error.get("error_code") {
+                                    Some(val) => Some(serde_json::from_value(val.clone()).unwrap()),
+                                    None => None,
+                                }
+                            } else {
+                                None
                             };
 
                             QueryError {
