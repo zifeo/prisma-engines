@@ -46,6 +46,7 @@ fn parse_configuration(datamodel: &str) -> ConnectorResult<(Datasource, String, 
 pub async fn setup(prisma_schema: &str) -> ConnectorResult<()> {
     let (source, url, _preview_features) = parse_configuration(prisma_schema)?;
 
+    println!("SETUP {:?} {:?}", url, source);
     match &source.active_provider {
         provider if [POSTGRES_SOURCE_NAME, COCKROACHDB_SOURCE_NAME].contains(&provider.as_str()) => {
             postgres_setup(url, prisma_schema).await?

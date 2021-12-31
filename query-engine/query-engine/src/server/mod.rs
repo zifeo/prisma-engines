@@ -1,9 +1,7 @@
 use crate::{context::PrismaContext, opt::PrismaOpt, PrismaResult};
 use datamodel::common::preview_features::PreviewFeature;
-use futures::task::Spawn;
-use hyper::header::CONTENT_TYPE;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, HeaderMap, Method, Request, Response, Server, StatusCode};
+use hyper::{header::CONTENT_TYPE, Body, HeaderMap, Method, Request, Response, Server, StatusCode};
 use opentelemetry::{global, propagation::Extractor, Context};
 use query_core::{schema::QuerySchemaRenderer, TxId};
 use request_handlers::{dmmf, GraphQLSchemaRenderer, GraphQlHandler, TxInput};
@@ -18,7 +16,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 const TRANSACTION_ID_HEADER: &str = "X-transaction-id";
 
 //// Shared application state.
-pub(crate) struct State {
+pub struct State {
     cx: Arc<PrismaContext>,
     enable_playground: bool,
     enable_debug_mode: bool,
@@ -48,9 +46,7 @@ impl Clone for State {
     }
 }
 
-/// Starts up the graphql query engine server
-#[tracing::instrument(skip(opts))]
-pub async fn listen(opts: PrismaOpt) -> PrismaResult<()> {
+pub async fn setup(opts: &PrismaOpt) -> PrismaResult<State> {
     let config = opts.configuration(false)?.subject;
     config.validate_that_one_datasource_is_provided()?;
 
@@ -66,6 +62,13 @@ pub async fn listen(opts: PrismaOpt) -> PrismaResult<()> {
         .await?;
 
     let state = State::new(cx, opts.enable_playground, opts.enable_debug_mode, enable_itx);
+    Ok(state)
+}
+
+/// Starts up the graphql query engine server
+#[tracing::instrument(skip(opts))]
+pub async fn listen(opts: PrismaOpt) -> PrismaResult<()> {
+    let state = setup(&opts).await?;
 
     let query_engine = make_service_fn(move |_| {
         let state = state.clone();
@@ -86,9 +89,10 @@ pub async fn listen(opts: PrismaOpt) -> PrismaResult<()> {
     Ok(())
 }
 
-async fn routes(state: State, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
+pub async fn routes(state: State, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let start = Instant::now();
 
+    println!("REQ {:?} {:?}", req.method(), req.uri().path());
     if req.method() == &Method::POST && req.uri().path().contains("transaction") && state.enable_itx {
         return handle_transaction(state, req).await;
     }
@@ -150,6 +154,7 @@ async fn routes(state: State, req: Request<Body>) -> Result<Response<Body>, hype
 /// The main query handler. This handles incoming GraphQL queries and passes it
 /// to the query engine.
 async fn graphql_handler(state: State, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
+    println!("IN GRAPH");
     // Check for debug headers if enabled.
     if state.enable_debug_mode {
         return Ok(handle_debug_headers(&req));
@@ -165,6 +170,7 @@ async fn graphql_handler(state: State, req: Request<Body>) -> Result<Response<Bo
         let body_start = req.into_body();
         // block and buffer request until the request has completed
         let full_body = hyper::body::to_bytes(body_start).await?;
+        println!("BODY REQ {:?}", full_body);
 
         match serde_json::from_slice(full_body.as_ref()) {
             Ok(body) => {
@@ -181,7 +187,8 @@ async fn graphql_handler(state: State, req: Request<Body>) -> Result<Response<Bo
 
                 Ok(res)
             }
-            Err(_) => {
+            Err(e) => {
+                println!("ERROR {:?}", e);
                 let res = Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .body(Body::empty())

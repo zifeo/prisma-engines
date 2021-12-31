@@ -50,7 +50,7 @@ impl Runner {
         match ident {
             "direct" => Self::direct(datamodel, connector_tag).await,
             "node-api" => Ok(Self::NodeApi(NodeApiRunner {})),
-            "binary" => Ok(Self::Binary(BinaryRunner {})),
+            "binary" => Self::binary(datamodel, connector_tag).await,
             unknown => Err(TestError::parse_error(format!("Unknown test runner '{}'", unknown))),
         }
     }
@@ -65,7 +65,7 @@ impl Runner {
         let response = match self {
             Runner::Direct(r) => r.query(gql_query).await,
             Runner::NodeApi(_) => todo!(),
-            Runner::Binary(_) => todo!(),
+            Runner::Binary(r) => r.query(gql_query).await,
         }?;
 
         if response.failed() {
@@ -91,11 +91,17 @@ impl Runner {
         Ok(Self::Direct(runner))
     }
 
+    async fn binary(datamodel: String, connector_tag: ConnectorTag) -> TestResult<Self> {
+        let runner = BinaryRunner::load(datamodel, connector_tag).await?;
+
+        Ok(Self::Binary(runner))
+    }
+
     pub fn connector(&self) -> &ConnectorTag {
         match self {
             Runner::Direct(r) => r.connector(),
             Runner::NodeApi(_) => todo!(),
-            Runner::Binary(_) => todo!(),
+            Runner::Binary(r) => r.connector(),
         }
     }
 
@@ -103,7 +109,7 @@ impl Runner {
         match self {
             Runner::Direct(r) => ConnectorVersion::from(r.connector()),
             Runner::NodeApi(_) => todo!(),
-            Runner::Binary(_) => todo!(),
+            Runner::Binary(r) => ConnectorVersion::from(r.connector()),
         }
     }
 
@@ -119,7 +125,7 @@ impl Runner {
         match self {
             Runner::Direct(r) => r.set_active_tx(tx_id),
             Runner::NodeApi(_) => todo!(),
-            Runner::Binary(_) => todo!(),
+            Runner::Binary(r) => r.set_active_tx(tx_id),
         }
     }
 
@@ -127,7 +133,7 @@ impl Runner {
         match self {
             Runner::Direct(r) => r.clear_active_tx(),
             Runner::NodeApi(_) => todo!(),
-            Runner::Binary(_) => todo!(),
+            Runner::Binary(r) => r.clear_active_tx(),
         }
     }
 }

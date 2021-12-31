@@ -3243,6 +3243,7 @@ dependencies = [
  "enum_dispatch",
  "enumflags2",
  "hyper",
+ "indexmap",
  "indoc",
  "itertools",
  "lazy_static",

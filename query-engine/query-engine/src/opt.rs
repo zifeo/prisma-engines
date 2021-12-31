@@ -111,6 +111,7 @@ struct SourceOverride {
 
 impl PrismaOpt {
     fn datamodel_str(&self) -> PrismaResult<&str> {
+        println!("HELLO {:?}", self.datamodel.clone().unwrap());
         let res = self
             .datamodel
             .as_deref()
@@ -127,6 +128,7 @@ impl PrismaOpt {
     pub fn datamodel(&self) -> PrismaResult<Datamodel> {
         let datamodel_str = self.datamodel_str()?;
 
+        println!("THE DATA MODEL {}", datamodel_str);
         let datamodel = datamodel::parse_datamodel(datamodel_str);
 
         match datamodel {
@@ -153,6 +155,7 @@ impl PrismaOpt {
                     .subject
                     .resolve_datasource_urls_from_env(&datasource_url_overrides, |key| env::var(key).ok())?;
 
+                println!("CONFIG {:?}", config);
                 Ok(config)
             })
         };
@@ -175,6 +178,13 @@ impl PrismaOpt {
     /// Enable query logging
     pub fn log_queries(&self) -> bool {
         std::env::var("LOG_QUERIES").map(|_| true).unwrap_or(self.log_queries)
+    }
+
+    // This is added it here to make it easier to create the options when using
+    // the http server in the tests
+    // Ok to unwrap here as this is only used in tests
+    pub fn from_list(list: &[&str]) -> Self {
+        PrismaOpt::from_iter_safe(list).unwrap()
     }
 }
 

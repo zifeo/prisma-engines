@@ -131,6 +131,54 @@ impl From<CoreError> for GQLResponse {
     }
 }
 
+// Only to be used for the binary runner tests
+// that is why we can have lots of unwraps
+#[cfg(test)]
+impl From<serde_json::Value> for GQLResponse {
+    fn from(val: serde_json::Value) -> Self {
+        let mut data = Map::new();
+
+        let val_obj = val.as_object().unwrap();
+
+        if val_obj.contains_key("data") {
+            val_obj
+                .get("data")
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .iter()
+                .for_each(|(key, value)| {
+                    data.insert(key.to_string(), Item::Json(value.clone()));
+                });
+        }
+
+        let gql_response = GQLResponse {
+            data: data,
+            ..Default::default()
+        };
+
+        // if val_obj.contains_key("errors") {
+        //     let errs = val_obj
+        //         .get("errors")
+        //         .unwrap()
+        //         .as_array()
+        //         .unwrap()
+        //         .iter()
+        //         .for_each(|error| {
+        //             let err_obj = error.as_object().unwrap();
+        //             let code = err_obj.get("error_code").unwrap();
+        //             let gql_error = GQLError {
+        //                 error: code,
+        //                 user_facing_error: user
+        //             }
+        //             gql_response.insert_error(error);
+        //         });
+        // }
+
+        gql_response
+    }
+}
+
 /// GQLBatchResponse converters
 
 impl GQLBatchResponse {
