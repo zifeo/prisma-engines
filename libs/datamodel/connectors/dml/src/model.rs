@@ -240,9 +240,28 @@ impl Model {
         self.scalar_fields().find(|f| f.name == *name)
     }
 
-    /// Finds a scalar field by name.
+    /// Finds a relation field by name.
     pub fn find_relation_field(&self, name: &str) -> Option<&RelationField> {
         self.relation_fields().find(|f| f.name == *name)
+    }
+
+    /// Finds a relation field by foreign key name
+    pub(crate) fn find_relation_field_with_fk_mut(&mut self, fk_name: &str) -> &mut RelationField {
+        let model_name = &self.name.clone();
+
+        let found = self
+            .relation_fields_mut()
+            .find(|f| f.relation_info.fk_name.as_deref() == Some(fk_name));
+
+        match found {
+            Some(field) => field,
+            None => {
+                panic!(
+                    "Could not find relation field with foreign key {} on model {}.",
+                    fk_name, model_name,
+                )
+            }
+        }
     }
 
     /// Finds a field by database name.
@@ -268,10 +287,13 @@ impl Model {
     #[track_caller]
     pub fn find_relation_field_mut(&mut self, name: &str) -> &mut RelationField {
         let model_name = &self.name.clone();
-        self.relation_fields_mut().find(|rf| rf.name == *name).expect(&*format!(
-            "Could not find relation field {} on model {}.",
-            name, model_name
-        ))
+
+        match self.relation_fields_mut().find(|rf| rf.name == *name) {
+            Some(field) => field,
+            None => {
+                panic!("Could not find relation field {} on model {}.", name, model_name);
+            }
+        }
     }
 
     /// This should match the logic in `prisma_models::Model::primary_identifier`.

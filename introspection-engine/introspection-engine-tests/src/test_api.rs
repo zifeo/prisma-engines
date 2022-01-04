@@ -155,7 +155,10 @@ impl TestApi {
     #[track_caller]
     pub async fn re_introspect_dml(&self, data_model_string: &str) -> Result<String> {
         let config = self.configuration();
-        let data_model = parse_datamodel(data_model_string);
+        let config_str = datamodel::render_datamodel_and_config_to_string(&Datamodel::new(), &config);
+
+        let data_model_string = format!("{}\n\n{}", config_str, data_model_string);
+        let data_model = parse_datamodel(&data_model_string);
         let introspection_result = self.test_introspect_internal(data_model).await?;
 
         let rendering_span = tracing::info_span!("render_datamodel after introspection");

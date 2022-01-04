@@ -1,0 +1,25 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:prisma@localhost:5435/postgres"
+}
+
+model A {
+  id Int @id
+  b  B?  @relation("first")
+  bs B[] @relation("second")
+}
+
+model B {
+  id    Int @id
+  a1_id Int @unique
+  a2_id Int
+  a1    A   @relation(map: "first_fk", name: "first", fields: [a1_id], references: [id])
+  a2    A   @relation(map: "second_fk", name: "second", fields: [a2_id], references: [id])
+}

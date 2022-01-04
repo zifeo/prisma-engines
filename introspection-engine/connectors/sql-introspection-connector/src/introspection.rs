@@ -6,7 +6,7 @@ use crate::introspection_helpers::{
 use crate::version_checker::VersionChecker;
 
 use crate::SqlError;
-use crate::{Dedup, SqlFamilyTrait};
+use crate::SqlFamilyTrait;
 use datamodel::{
     common::preview_features::PreviewFeature, dml, walkers::find_model_by_db_name, Datamodel, Field, Model,
     PrimaryKeyDefinition, PrimaryKeyField, RelationField, SortOrder,
@@ -47,8 +47,7 @@ pub fn introspect(
             model.add_field(Field::ScalarField(field));
         }
 
-        let mut foreign_keys_copy = table.foreign_keys.clone();
-        foreign_keys_copy.clear_duplicates();
+        let foreign_keys_copy = table.foreign_keys.clone();
 
         for foreign_key in &foreign_keys_copy {
             version_check.has_inline_relations(table);

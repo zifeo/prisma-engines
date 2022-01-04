@@ -2,7 +2,7 @@ use crate::introspection_helpers::{
     replace_index_field_names, replace_pk_field_names, replace_relation_info_field_names,
 };
 use crate::{warnings::*, SqlFamilyTrait};
-use datamodel::{Datamodel, DefaultValue, Field, FieldType, Ignorable, ValueGenerator, WithName};
+use datamodel::{Datamodel, DefaultValue, Field, FieldArity, FieldType, Ignorable, ValueGenerator, WithName};
 use introspection_connector::{IntrospectionContext, Warning};
 use prisma_value::PrismaValue;
 use std::cmp::Ordering::{self, Equal, Greater, Less};
@@ -345,45 +345,71 @@ fn merge_changed_scalar_key_names(
 
 //always keep old virtual relationfield names
 fn merge_changed_relation_field_names(old_data_model: &Datamodel, new_data_model: &mut Datamodel) {
-    let mut changed_relation_field_names = vec![];
+    let mut changed_relation_field_names = Vec::new();
 
-    for new_model in new_data_model.models() {
+    #[derive(Debug)]
+    struct Key {
+        model: String,
+        field: String,
+        fk_name: Option<String>,
+    }
+
+    #[derive(Debug)]
+    struct Change {
+        name: String,
+        arity: FieldArity,
+    }
+
+    let models = new_data_model.models().filter_map(|new_model| {
+        old_data_model
+            .find_model(&new_model.name)
+            .map(|old_model| (new_model, old_model))
+    });
+
+    for (new_model, old_model) in models {
         for new_field in new_model.relation_fields() {
-            if let Some(old_model) = old_data_model.find_model(&new_model.name) {
-                for old_field in old_model.relation_fields() {
-                    let (_, old_related_field) = &old_data_model.find_related_field_bang(old_field);
-                    let is_many_to_many = old_field.is_list() && old_related_field.is_list();
-                    let is_self_relation = old_field.relation_info.to == old_related_field.relation_info.to;
+            for old_field in old_model.relation_fields() {
+                let (_, old_related_field) = &old_data_model.find_related_field_bang(old_field);
+                let is_many_to_many = old_field.is_list() && old_related_field.is_list();
+                let is_self_relation = old_field.relation_info.to == old_related_field.relation_info.to;
 
-                    let (_, related_field) = &new_data_model.find_related_field_bang(new_field);
+                let (_, related_field) = &new_data_model.find_related_field_bang(new_field);
 
-                    //the relationinfos of both sides need to be compared since the relationinfo of the
-                    // non-fk side does not contain enough information to uniquely identify the correct relationfield
-                    let relation_info_partial_eq = old_field.relation_info == new_field.relation_info
-                        && old_related_field.relation_info == related_field.relation_info;
+                //the relationinfos of both sides need to be compared since the relationinfo of the
+                // non-fk side does not contain enough information to uniquely identify the correct relationfield
+                let relation_info_partial_eq = old_field.relation_info == new_field.relation_info
+                    && old_related_field.relation_info == related_field.relation_info;
 
-                    let mf = ModelAndField::new(&new_model.name, &new_field.name);
-
-                    if relation_info_partial_eq
-                        && (!is_many_to_many
+                if relation_info_partial_eq
+                    && (!is_many_to_many
                                 //For many to many the relation infos always look the same, here we have to look at the relation name,
                                 //which translates to the join table name. But in case of self relations we cannot correctly infer the old name
                                 || (old_field.relation_info.name == new_field.relation_info.name && !is_self_relation))
-                    {
-                        changed_relation_field_names.push((mf.clone(), old_field.name.clone()));
-                    }
+                {
+                    let key = Key {
+                        model: new_model.name.clone(),
+                        field: new_field.name.clone(),
+                        fk_name: new_field.relation_info.fk_name.as_ref().cloned(),
+                    };
+
+                    let changes = Change {
+                        name: old_field.name.clone(),
+                        arity: old_field.arity,
+                    };
+
+                    changed_relation_field_names.push((key, changes));
                 }
             }
         }
     }
 
-    for changed_relation_field_name in changed_relation_field_names {
-        new_data_model
-            .find_relation_field_mut(
-                &changed_relation_field_name.0.model,
-                &changed_relation_field_name.0.field,
-            )
-            .name = changed_relation_field_name.1;
+    for (key, changes) in dbg!(changed_relation_field_names) {
+        let mut field = match dbg!(key.fk_name) {
+            Some(fk_name) => new_data_model.find_relation_field_with_fk_mut(&key.model, &fk_name),
+            None => new_data_model.find_relation_field_mut(&key.model, &key.field),
+        };
+
+        field.name = changes.name;
     }
 }
 

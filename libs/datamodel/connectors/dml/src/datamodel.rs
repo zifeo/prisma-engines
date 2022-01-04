@@ -91,6 +91,11 @@ impl Datamodel {
         self.find_model_mut(model).find_relation_field_mut(field)
     }
 
+    #[track_caller]
+    pub fn find_relation_field_with_fk_mut(&mut self, model: &str, fk_name: &str) -> &mut RelationField {
+        self.find_model_mut(model).find_relation_field_with_fk_mut(fk_name)
+    }
+
     /// Finds an enum by name.
     pub fn find_enum(&self, name: &str) -> Option<&Enum> {
         self.enums().find(|m| m.name == *name)

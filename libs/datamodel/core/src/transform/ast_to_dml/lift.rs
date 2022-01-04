@@ -203,6 +203,8 @@ impl<'a> LiftAstToDml<'a> {
                             field
                         };
 
+                        field.relation_info.fk_name = Some(relation.constraint_name(active_connector).into_owned());
+
                         field.relation_info.name = relation.relation_name().to_string();
                         model.add_field(dml::Field::RelationField(field));
                     };

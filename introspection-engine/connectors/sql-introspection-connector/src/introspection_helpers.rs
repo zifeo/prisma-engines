@@ -273,7 +273,7 @@ pub(crate) fn calculate_backrelation_field(
         Ok(table) => {
             let new_relation_info = RelationInfo {
                 name: relation_info.name.clone(),
-                fk_name: None,
+                fk_name: relation_field.relation_info.fk_name.clone(),
                 to: model.name.clone(),
                 fields: vec![],
                 references: vec![],
